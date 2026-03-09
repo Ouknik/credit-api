@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DebtController;
 use App\Http\Controllers\Api\RechargeController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\WalletApiController;
 
 /*
 |--------------------------------------------------------------------------
@@ -54,4 +55,7 @@ Route::middleware(['jwt.auth'])->group(function () {
     Route::get('recharges', [RechargeController::class, 'index']);
     Route::post('recharges', [RechargeController::class, 'store'])->middleware('recharge.limit');
     Route::get('recharges/operators', [RechargeController::class, 'operators']);
+
+    // Wallet Transactions
+    Route::get('wallet/transactions', [WalletApiController::class, 'index']);
 });

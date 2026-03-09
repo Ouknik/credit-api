@@ -84,11 +84,11 @@ class CadeauxGateway
 
     /**
      * @param  string  $orderId
-     * @return string  One of: queued, processing, success, failed, balance_error
+     * @return array   Full gateway response, always includes 'status' key
      *
      * @throws RuntimeException
      */
-    public function checkStatus(string $orderId): string
+    public function checkStatus(string $orderId): array
     {
         try {
             $response = Http::timeout($this->timeout)
@@ -106,14 +106,17 @@ class CadeauxGateway
                 throw new RuntimeException("Gateway status check returned HTTP {$response->status()}");
             }
 
-            $status = $response->json('status', 'unknown');
+            $data = $response->json() ?? [];
+            if (!isset($data['status'])) {
+                $data['status'] = 'unknown';
+            }
 
             Log::info('CadeauxGateway: status check', [
                 'order_id' => $orderId,
-                'status'   => $status,
+                'status'   => $data['status'],
             ]);
 
-            return $status;
+            return $data;
         } catch (RuntimeException $e) {
             throw $e;
         } catch (\Exception $e) {

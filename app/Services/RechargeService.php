@@ -1,0 +1,190 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Recharge;
+use App\Models\Debt;
+use App\Models\RechargeTransaction;
+use App\Repositories\ShopRepository;
+use App\Repositories\RechargeRepository;
+use App\Repositories\CustomerRepository;
+use App\Jobs\ProcessRechargeJob;
+use App\Models\AuditLog;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+
+class RechargeService
+{
+    public function __construct(
+        private ShopRepository $shopRepository,
+        private RechargeRepository $rechargeRepository,
+        private CustomerRepository $customerRepository,
+        private WalletService $walletService,
+    ) {}
+
+    public function getRechargesByShop(string $shopId, int $perPage = 15, array $filters = []): LengthAwarePaginator
+    {
+        return $this->rechargeRepository->paginateByShopId($shopId, $perPage, $filters);
+    }
+
+    public function initiateRecharge(string $shopId, array $data): array
+    {
+        // Check for idempotency
+        if (!empty($data['idempotency_key'])) {
+            $existing = $this->rechargeRepository->findByIdempotencyKey($data['idempotency_key']);
+            if ($existing) {
+                return [
+                    'success' => true,
+                    'recharge' => $existing,
+                    'message' => 'Recharge already processed',
+                    'duplicate' => true,
+                ];
+            }
+        }
+
+        return DB::transaction(function () use ($shopId, $data) {
+            // Lock shop row to prevent race conditions
+            $shop = $this->shopRepository->lockForUpdate($shopId);
+
+            if (!$shop) {
+                return [
+                    'success' => false,
+                    'message' => 'Shop not found',
+                ];
+            }
+
+            // Check shop status
+            if (!$shop->isActive()) {
+                return [
+                    'success' => false,
+                    'message' => 'Shop account is suspended',
+                ];
+            }
+
+            // Check balance
+            if (!$shop->hasEnoughBalance($data['amount'])) {
+                return [
+                    'success' => false,
+                    'message' => 'Insufficient balance',
+                ];
+            }
+
+            // Generate unique reference code
+            $referenceCode = $this->generateReferenceCode();
+
+            // Create recharge record first (so we have the reference)
+            $recharge = $this->rechargeRepository->create([
+                'shop_id' => $shopId,
+                'customer_id' => $data['customer_id'] ?? null,
+                'phone' => $data['phone'],
+                'operator' => $data['operator'],
+                'amount' => $data['amount'],
+                'offer' => $data['offer'] ?? null,
+                'status' => 'pending',
+                'reference_code' => $referenceCode,
+                'idempotency_key' => $data['idempotency_key'] ?? null,
+            ]);
+
+            // Deduct balance via WalletService (atomic, creates WalletTransaction)
+            $this->walletService->deduct(
+                shopId: $shopId,
+                amount: $data['amount'],
+                type: 'recharge',
+                description: "Recharge {$data['phone']} ({$data['operator']})",
+                reference: $referenceCode,
+            );
+
+            AuditLog::log($shopId, 'recharge.initiated', [
+                'recharge_id' => $recharge->id,
+                'reference_code' => $referenceCode,
+                'phone' => $data['phone'],
+                'operator' => $data['operator'],
+                'amount' => $data['amount'],
+                'balance_after' => $shop->balance,
+            ]);
+
+            // Dispatch job to process recharge
+            ProcessRechargeJob::dispatch($recharge);
+
+            return [
+                'success' => true,
+                'recharge' => $recharge,
+                'message' => 'Recharge initiated successfully',
+            ];
+        });
+    }
+
+    public function handleRechargeSuccess(Recharge $recharge, array $response): void
+    {
+        DB::transaction(function () use ($recharge, $response) {
+            $recharge->markAsSuccess();
+
+            RechargeTransaction::create([
+                'recharge_id' => $recharge->id,
+                'raw_response' => $response,
+                'processed_at' => now(),
+            ]);
+
+            // If customer exists, create debt record
+            if ($recharge->customer_id) {
+                Debt::create([
+                    'shop_id' => $recharge->shop_id,
+                    'customer_id' => $recharge->customer_id,
+                    'amount' => $recharge->amount,
+                    'type' => 'recharge',
+                    'description' => "Recharge {$recharge->phone} - {$recharge->operator}",
+                ]);
+            }
+
+            AuditLog::log($recharge->shop_id, 'recharge.success', [
+                'recharge_id' => $recharge->id,
+                'reference_code' => $recharge->reference_code,
+            ]);
+        });
+    }
+
+    public function handleRechargeFailure(Recharge $recharge, array $response): void
+    {
+        DB::transaction(function () use ($recharge, $response) {
+            $recharge->markAsFailed();
+
+            RechargeTransaction::create([
+                'recharge_id' => $recharge->id,
+                'raw_response' => $response,
+                'processed_at' => now(),
+            ]);
+
+            // Refund balance via WalletService (atomic, creates WalletTransaction)
+            $this->walletService->refund(
+                shopId: $recharge->shop_id,
+                amount: $recharge->amount,
+                description: "Remboursement recharge échouée {$recharge->phone}",
+                reference: $recharge->reference_code,
+            );
+
+            AuditLog::log($recharge->shop_id, 'recharge.failed', [
+                'recharge_id' => $recharge->id,
+                'reference_code' => $recharge->reference_code,
+                'refunded_amount' => $recharge->amount,
+            ]);
+        });
+    }
+
+    public function getRechargeStats(string $shopId): array
+    {
+        return [
+            'today_count' => $this->rechargeRepository->getTodayRechargesCountByShopId($shopId),
+            'today_amount' => $this->rechargeRepository->getTodayRechargesAmountByShopId($shopId),
+        ];
+    }
+
+    private function generateReferenceCode(): string
+    {
+        do {
+            $code = 'RCH-' . strtoupper(Str::random(12));
+        } while ($this->rechargeRepository->findByReferenceCode($code));
+
+        return $code;
+    }
+}

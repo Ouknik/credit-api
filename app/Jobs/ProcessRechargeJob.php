@@ -32,6 +32,19 @@ class ProcessRechargeJob implements ShouldQueue
 
     public function handle(CadeauxGateway $gateway, RechargeService $rechargeService): void
     {
+        // Guard: if already sent to gateway (retry safety), skip re-send
+        $this->recharge->refresh();
+        if ($this->recharge->isTerminal()) {
+            return;
+        }
+
+        if ($this->recharge->gateway_response !== null) {
+            // Already sent to Pi — just ensure status checker is running
+            CheckRechargeStatusJob::dispatch($this->recharge)
+                ->delay(now()->addSeconds(10));
+            return;
+        }
+
         Log::info('ProcessRechargeJob: sending to gateway', [
             'recharge_id'    => $this->recharge->id,
             'reference_code' => $this->recharge->reference_code,

@@ -117,6 +117,11 @@ class RechargeService
 
     public function handleRechargeSuccess(Recharge $recharge, array $response): void
     {
+        $recharge->refresh();
+        if ($recharge->isTerminal()) {
+            return;
+        }
+
         DB::transaction(function () use ($recharge, $response) {
             $recharge->markAsSuccess();
 
@@ -146,6 +151,11 @@ class RechargeService
 
     public function handleRechargeFailure(Recharge $recharge, array $response): void
     {
+        $recharge->refresh();
+        if ($recharge->isTerminal()) {
+            return;
+        }
+
         DB::transaction(function () use ($recharge, $response) {
             $recharge->markAsFailed();
 

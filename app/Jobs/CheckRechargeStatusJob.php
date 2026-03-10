@@ -97,9 +97,15 @@ class CheckRechargeStatusJob implements ShouldQueue
 
                 case 'queued':
                 case 'processing':
+                case 'no_signal':
                     // Non-terminal: update status and re-poll
                     if ($status === 'processing') {
                         $this->recharge->markAsProcessing();
+                    }
+                    if ($status === 'no_signal') {
+                        Log::warning('CheckRechargeStatusJob: gateway has no signal', [
+                            'recharge_id' => $this->recharge->id,
+                        ]);
                     }
                     $this->scheduleNextPoll($rechargeService);
                     break;

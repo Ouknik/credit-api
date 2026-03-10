@@ -55,6 +55,16 @@ class ProcessRechargeJob implements ShouldQueue
         ]);
 
         try {
+            // Check gateway health before sending
+            $health = $gateway->checkHealth();
+            if (($health['status'] ?? '') === 'down') {
+                Log::warning('ProcessRechargeJob: gateway modem is down, retrying later', [
+                    'recharge_id' => $this->recharge->id,
+                    'health'      => $health,
+                ]);
+                throw new \RuntimeException('Gateway modem is down');
+            }
+
             // Send recharge request to Raspberry Pi
             $response = $gateway->sendRecharge(
                 orderId: $this->recharge->reference_code,
@@ -73,6 +83,13 @@ class ProcessRechargeJob implements ShouldQueue
                 'queue_pos'   => $response['queue'] ?? null,
                 'status'      => $response['status'] ?? 'unknown',
             ]);
+
+            // If Pi says duplicate, it already has it — just poll status
+            if (($response['status'] ?? '') === 'duplicate') {
+                Log::info('ProcessRechargeJob: Pi reports duplicate, skipping to status poll', [
+                    'recharge_id' => $this->recharge->id,
+                ]);
+            }
 
             // Dispatch status checker — starts polling after 10 seconds
             CheckRechargeStatusJob::dispatch($this->recharge)

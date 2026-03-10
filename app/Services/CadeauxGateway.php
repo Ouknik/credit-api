@@ -146,4 +146,30 @@ class CadeauxGateway
             return false;
         }
     }
+
+    /**
+     * Check the gateway health status (modem, signal, queue).
+     *
+     * @return array{status: string, modem: bool, signal: int, queue: int}
+     */
+    public function checkHealth(): array
+    {
+        try {
+            $response = Http::timeout(10)
+                ->withHeaders([
+                    'token' => $this->token,
+                    'ngrok-skip-browser-warning' => 'true',
+                ])
+                ->get("{$this->baseUrl}/health");
+
+            if ($response->successful()) {
+                return $response->json() ?? ['status' => 'unknown'];
+            }
+
+            return ['status' => 'unreachable'];
+        } catch (\Exception $e) {
+            Log::warning('CadeauxGateway: health check failed', ['error' => $e->getMessage()]);
+            return ['status' => 'unreachable'];
+        }
+    }
 }

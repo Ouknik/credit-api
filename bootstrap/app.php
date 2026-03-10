@@ -17,6 +17,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'recharge.limit' => \App\Http\Middleware\RechargeRateLimiter::class,
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
         ]);
+
+        $middleware->redirectGuestsTo('/admin/login');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

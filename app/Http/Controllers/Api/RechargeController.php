@@ -101,6 +101,30 @@ class RechargeController extends Controller
 
     /**
      * @OA\Get(
+     *     path="/recharges/{id}",
+     *     summary="Get a single recharge by ID",
+     *     tags={"Recharges"},
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(name="id", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *     @OA\Response(response=200, description="Recharge retrieved successfully"),
+     *     @OA\Response(response=404, description="Recharge not found")
+     * )
+     */
+    public function show(string $id): JsonResponse
+    {
+        $recharge = \App\Models\Recharge::where('id', $id)
+            ->where('shop_id', $this->shopId())
+            ->first();
+
+        if (!$recharge) {
+            return $this->error('Recharge not found', 404);
+        }
+
+        return $this->success($recharge);
+    }
+
+    /**
+     * @OA\Get(
      *     path="/recharges/operators",
      *     summary="Get available operators",
      *     tags={"Recharges"},

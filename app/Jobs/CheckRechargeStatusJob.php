@@ -95,6 +95,14 @@ class CheckRechargeStatusJob implements ShouldQueue
                     Log::warning('CheckRechargeStatusJob: BALANCE_ERROR', ['recharge_id' => $this->recharge->id]);
                     break;
 
+                case 'rejected':
+                    $rechargeService->handleRechargeRejected($this->recharge, [
+                        'success' => false,
+                        'error'   => $response['error'] ?? 'Recharge rejected by gateway',
+                    ]);
+                    Log::warning('CheckRechargeStatusJob: REJECTED', ['recharge_id' => $this->recharge->id]);
+                    break;
+
                 case 'queued':
                 case 'processing':
                 case 'no_signal':

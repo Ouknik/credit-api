@@ -10,6 +10,7 @@ use App\Repositories\RechargeRepository;
 use App\Repositories\CustomerRepository;
 use App\Jobs\ProcessRechargeJob;
 use App\Models\AuditLog;
+use App\Events\RechargeUpdated;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -147,6 +148,8 @@ class RechargeService
                 'reference_code' => $recharge->reference_code,
             ]);
         });
+
+        $this->broadcastRechargeUpdate($recharge);
     }
 
     public function handleRechargeFailure(Recharge $recharge, array $response): void
@@ -179,6 +182,8 @@ class RechargeService
                 'refunded_amount' => $recharge->amount,
             ]);
         });
+
+        $this->broadcastRechargeUpdate($recharge);
     }
 
     public function getRechargeStats(string $shopId): array
@@ -196,5 +201,58 @@ class RechargeService
         } while ($this->rechargeRepository->findByReferenceCode($code));
 
         return $code;
+    }
+
+    public function handleRechargeRejected(Recharge $recharge, array $response): void
+    {
+        $recharge->refresh();
+        if ($recharge->isTerminal()) {
+            return;
+        }
+
+        DB::transaction(function () use ($recharge, $response) {
+            $recharge->markAsRejected();
+
+            RechargeTransaction::create([
+                'recharge_id' => $recharge->id,
+                'raw_response' => $response,
+                'processed_at' => now(),
+            ]);
+
+            // Refund balance
+            $this->walletService->refund(
+                shopId: $recharge->shop_id,
+                amount: $recharge->amount,
+                description: "Remboursement recharge rejetée {$recharge->phone}",
+                reference: $recharge->reference_code,
+            );
+
+            AuditLog::log($recharge->shop_id, 'recharge.rejected', [
+                'recharge_id' => $recharge->id,
+                'reference_code' => $recharge->reference_code,
+                'refunded_amount' => $recharge->amount,
+            ]);
+        });
+
+        $this->broadcastRechargeUpdate($recharge);
+    }
+
+    private function broadcastRechargeUpdate(Recharge $recharge): void
+    {
+        try {
+            event(new RechargeUpdated(
+                shopId: $recharge->shop_id,
+                rechargeId: $recharge->id,
+                referenceCode: $recharge->reference_code,
+                status: $recharge->status,
+                phone: $recharge->phone,
+                amount: (float) $recharge->amount,
+            ));
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::warning('Failed to broadcast recharge update', [
+                'recharge_id' => $recharge->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

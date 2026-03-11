@@ -96,6 +96,11 @@ class Recharge extends Model
         $this->update(['status' => 'balance_error']);
     }
 
+    public function markAsRejected(): void
+    {
+        $this->update(['status' => 'rejected']);
+    }
+
     public function isProcessing(): bool
     {
         return $this->status === 'processing';
@@ -106,8 +111,13 @@ class Recharge extends Model
         return $this->status === 'balance_error';
     }
 
+    public function isRejected(): bool
+    {
+        return $this->status === 'rejected';
+    }
+
     public function isTerminal(): bool
     {
-        return in_array($this->status, ['success', 'failed', 'balance_error']);
+        return in_array($this->status, ['success', 'failed', 'balance_error', 'rejected']);
     }
 }

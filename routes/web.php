@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AdminAuthController;
 use App\Http\Controllers\Admin\AdminCustomerController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\GatewayController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\ShopController;
 use App\Http\Controllers\Admin\WalletController;
@@ -43,4 +44,8 @@ Route::prefix('admin')->middleware(['auth:web', 'admin'])->group(function () {
     Route::get('/shops/{shop}/wallet', [WalletController::class, 'shopHistory'])->name('admin.shops.wallet.history');
     Route::get('/shops/{shop}/deposit', [WalletController::class, 'depositForm'])->name('admin.shops.wallet.deposit');
     Route::post('/shops/{shop}/deposit', [WalletController::class, 'deposit'])->name('admin.shops.wallet.deposit.submit');
+
+    // Gateway Monitor
+    Route::get('/gateway', [GatewayController::class, 'index'])->name('admin.gateway.index');
+    Route::get('/gateway/health', [GatewayController::class, 'health'])->name('admin.gateway.health');
 });

@@ -124,6 +124,17 @@ class RechargeController extends Controller
     }
 
     /**
+     * Check if the recharge gateway (Pi) is online and healthy.
+     */
+    public function gatewayHealth(): JsonResponse
+    {
+        $gateway = app(\App\Services\CadeauxGateway::class);
+        $health = $gateway->checkHealth();
+
+        return $this->success($health);
+    }
+
+    /**
      * @OA\Get(
      *     path="/recharges/operators",
      *     summary="Get available operators",

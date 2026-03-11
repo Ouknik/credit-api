@@ -83,6 +83,7 @@
                     <th class="px-4 py-3 text-left">Opérateur</th>
                     <th class="px-4 py-3 text-right">Montant</th>
                     <th class="px-4 py-3 text-center">Statut</th>
+                    <th class="px-4 py-3 text-left">Message Système</th>
                     <th class="px-4 py-3 text-left">Date</th>
                 </tr>
             </thead>
@@ -121,11 +122,21 @@
                             {{ $label }}
                         </span>
                     </td>
+                    <td class="px-4 py-3 text-xs text-gray-600 max-w-xs truncate" title="{{ $r->gateway_message ?? '' }}">
+                        @if($r->gateway_message)
+                            <span class="inline-flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+                                {{ Str::limit($r->gateway_message, 60) }}
+                            </span>
+                        @else
+                            <span class="text-gray-300">—</span>
+                        @endif
+                    </td>
                     <td class="px-4 py-3 text-xs text-gray-500">{{ $r->created_at->format('d/m H:i') }}</td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="7" class="px-4 py-8 text-center text-gray-400">Aucune recharge</td>
+                    <td colspan="8" class="px-4 py-8 text-center text-gray-400">Aucune recharge</td>
                 </tr>
                 @endforelse
             </tbody>

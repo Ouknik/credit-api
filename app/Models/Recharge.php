@@ -39,6 +39,7 @@ class Recharge extends Model
         'reference_code',
         'idempotency_key',
         'gateway_response',
+        'gateway_message',
     ];
 
     protected $casts = [

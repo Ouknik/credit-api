@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\DebtController;
+use App\Http\Controllers\Api\GatewayCallbackController;
 use App\Http\Controllers\Api\RechargeController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\WalletApiController;
@@ -16,6 +17,9 @@ use App\Http\Controllers\Api\WalletApiController;
 | Credit & Recharge Platform API Routes
 |
 */
+
+// Gateway callback (Pi pushes recharge results — authenticated by gateway token)
+Route::post('gateway/callback', GatewayCallbackController::class);
 
 // Public routes
 Route::prefix('auth')->group(function () {

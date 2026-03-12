@@ -1,34 +1,44 @@
 #!/bin/bash
-# Run this on the server after git pull
+# Setup queue worker for shared hosting (cron-based)
 # Usage: bash deploy/setup-worker.sh
+#
+# This adds a cron job that runs queue:work every minute.
 
 set -e
 
-echo "=== Installing supervisor if needed ==="
-if ! command -v supervisord &> /dev/null; then
-    apt-get update && apt-get install -y supervisor
-    systemctl enable supervisor
-    systemctl start supervisor
+# Auto-detect the project directory
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+PHP_BIN=$(which php)
+
+echo "=== Project: $PROJECT_DIR ==="
+echo "=== PHP: $PHP_BIN ==="
+
+# Create log file
+touch "$PROJECT_DIR/storage/logs/worker.log"
+
+# The cron line: run queue worker every minute, process jobs and stop
+CRON_CMD="* * * * * cd $PROJECT_DIR && $PHP_BIN artisan queue:work --stop-when-empty --max-time=55 >> storage/logs/worker.log 2>&1"
+
+# Also keep Laravel scheduler
+SCHEDULER_CMD="* * * * * cd $PROJECT_DIR && $PHP_BIN artisan schedule:run >> /dev/null 2>&1"
+
+# Check if cron already has our worker
+if crontab -l 2>/dev/null | grep -q "queue:work"; then
+    echo "=== Queue worker cron already exists, updating... ==="
+    # Remove old entry and add new one
+    (crontab -l 2>/dev/null | grep -v "queue:work" | grep -v "schedule:run"; echo "$CRON_CMD"; echo "$SCHEDULER_CMD") | crontab -
+else
+    echo "=== Adding queue worker cron ==="
+    (crontab -l 2>/dev/null; echo "$CRON_CMD"; echo "$SCHEDULER_CMD") | crontab -
 fi
 
-echo "=== Copying worker config ==="
-cp /var/www/credit-api/deploy/credit-worker.conf /etc/supervisor/conf.d/credit-worker.conf
-
-echo "=== Creating log file ==="
-touch /var/www/credit-api/storage/logs/worker.log
-chown www-data:www-data /var/www/credit-api/storage/logs/worker.log
-
-echo "=== Reloading supervisor ==="
-supervisorctl reread
-supervisorctl update
-supervisorctl start credit-worker:*
-
-echo "=== Done! Checking status ==="
-supervisorctl status credit-worker:*
+echo ""
+echo "=== Current crontab ==="
+crontab -l
 
 echo ""
-echo "Worker is running! Commands you may need later:"
-echo "  supervisorctl status credit-worker:*    # Check status"
-echo "  supervisorctl restart credit-worker:*   # Restart worker"
-echo "  supervisorctl stop credit-worker:*      # Stop worker"
-echo "  tail -f /var/www/credit-api/storage/logs/worker.log  # Watch logs"
+echo "=== Done! Queue worker will run every minute ==="
+echo "Commands:"
+echo "  tail -f $PROJECT_DIR/storage/logs/worker.log  # Watch worker logs"
+echo "  crontab -e  # Edit cron manually"
+echo "  $PHP_BIN $PROJECT_DIR/artisan queue:work --stop-when-empty  # Run manually once"

@@ -19,6 +19,7 @@ class InitiateRechargeRequest extends FormRequest
             'amount' => ['required', 'numeric', 'min:5', 'max:1000'],
             'offer' => ['required', 'string', 'max:10'],
             'customer_id' => ['nullable', 'uuid', 'exists:customers,id'],
+            'as_debt' => ['nullable', 'boolean'],
             'idempotency_key' => ['nullable', 'string', 'max:64'],
         ];
     }

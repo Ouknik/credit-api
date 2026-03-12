@@ -41,7 +41,7 @@ class RechargeController extends Controller
         $recharges = $this->rechargeService->getRechargesByShop(
             $this->shopId(),
             $request->input('per_page', 15),
-            $request->only(['status', 'operator', 'phone', 'date_from', 'date_to'])
+            $request->only(['status', 'operator', 'phone', 'customer_id', 'date_from', 'date_to'])
         );
 
         return $this->success($recharges);
@@ -114,6 +114,7 @@ class RechargeController extends Controller
     {
         $recharge = \App\Models\Recharge::where('id', $id)
             ->where('shop_id', $this->shopId())
+            ->with('customer')
             ->first();
 
         if (!$recharge) {

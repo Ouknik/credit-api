@@ -163,4 +163,35 @@ class CustomerController extends Controller
 
         return $this->success(null, 'Customer deleted successfully');
     }
+
+    /**
+     * Get customer stats for the shop.
+     */
+    public function stats(string $customer): JsonResponse
+    {
+        $customerModel = $this->customerService->getCustomer($this->shopId(), $customer);
+
+        if (!$customerModel) {
+            return $this->error('Customer not found', 404);
+        }
+
+        $rechargeCount = \App\Models\Recharge::where('customer_id', $customer)
+            ->where('shop_id', $this->shopId())
+            ->count();
+
+        $rechargeAmount = \App\Models\Recharge::where('customer_id', $customer)
+            ->where('shop_id', $this->shopId())
+            ->where('status', 'success')
+            ->sum('amount');
+
+        $totalDebt = \App\Models\Debt::where('customer_id', $customer)
+            ->where('shop_id', $this->shopId())
+            ->sum('amount');
+
+        return $this->success([
+            'total_recharges' => $rechargeCount,
+            'total_recharges_amount' => (float) $rechargeAmount,
+            'total_debt' => (float) $totalDebt,
+        ]);
+    }
 }

@@ -82,6 +82,7 @@ class RechargeService
                 'operator' => $data['operator'],
                 'amount' => $data['amount'],
                 'offer' => $data['offer'] ?? null,
+                'as_debt' => !empty($data['as_debt']),
                 'status' => 'pending',
                 'reference_code' => $referenceCode,
                 'idempotency_key' => $data['idempotency_key'] ?? null,
@@ -132,8 +133,8 @@ class RechargeService
                 'processed_at' => now(),
             ]);
 
-            // If customer exists, create debt record
-            if ($recharge->customer_id) {
+            // If customer exists AND as_debt is true, create debt record
+            if ($recharge->customer_id && $recharge->as_debt) {
                 Debt::create([
                     'shop_id' => $recharge->shop_id,
                     'customer_id' => $recharge->customer_id,

@@ -35,6 +35,7 @@ class Recharge extends Model
         'operator',
         'amount',
         'offer',
+        'as_debt',
         'status',
         'reference_code',
         'idempotency_key',
@@ -44,7 +45,13 @@ class Recharge extends Model
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'as_debt' => 'boolean',
         'gateway_response' => 'array',
+    ];
+
+    protected $hidden = [
+        'idempotency_key',
+        'gateway_response',
     ];
 
     public function shop(): BelongsTo

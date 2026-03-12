@@ -95,6 +95,26 @@ class GatewayCallbackController extends Controller
                 ]);
                 break;
 
+            case 'no_signal':
+                // Non-terminal: just update status + save message, don't refund
+                $recharge->update(['status' => 'no_signal']);
+                Log::info('GatewayCallback: no_signal, waiting for retry', ['order_id' => $orderId]);
+                $this->broadcastUpdate($recharge);
+                break;
+
+            case 'queued':
+                // Non-terminal: just update status + save message
+                $recharge->update(['status' => 'queued']);
+                Log::info('GatewayCallback: queued on gateway', ['order_id' => $orderId]);
+                $this->broadcastUpdate($recharge);
+                break;
+
+            case 'processing':
+                $recharge->markAsProcessing();
+                Log::info('GatewayCallback: processing', ['order_id' => $orderId]);
+                $this->broadcastUpdate($recharge);
+                break;
+
             case 'failed':
             default:
                 $this->rechargeService->handleRechargeFailure($recharge, [
@@ -109,5 +129,24 @@ class GatewayCallbackController extends Controller
         Log::info('GatewayCallback: processed', compact('orderId', 'status'));
 
         return response()->json(['status' => 'ok', 'processed' => $status]);
+    }
+
+    /**
+     * Broadcast a non-terminal status update via Pusher.
+     */
+    private function broadcastUpdate(Recharge $recharge): void
+    {
+        try {
+            event(new \App\Events\RechargeUpdated(
+                shopId: $recharge->shop_id,
+                rechargeId: $recharge->id,
+                referenceCode: $recharge->reference_code,
+                status: $recharge->status,
+                phone: $recharge->phone,
+                amount: (float) $recharge->amount,
+            ));
+        } catch (\Exception $e) {
+            Log::warning('GatewayCallback: broadcast failed', ['error' => $e->getMessage()]);
+        }
     }
 }

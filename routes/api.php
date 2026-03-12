@@ -46,6 +46,7 @@ Route::middleware(['jwt.auth'])->group(function () {
 
     // Customers
     Route::apiResource('customers', CustomerController::class);
+    Route::get('customers/{customer}/stats', [CustomerController::class, 'stats']);
     
     // Customer Debts & Payments
     Route::get('customers/{customer}/debts', [DebtController::class, 'customerDebts']);

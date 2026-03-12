@@ -42,6 +42,10 @@ class RechargeRepository extends BaseRepository
             $query->where('phone', 'like', "%{$filters['phone']}%");
         }
 
+        if (!empty($filters['customer_id'])) {
+            $query->where('customer_id', $filters['customer_id']);
+        }
+
         if (!empty($filters['date_from'])) {
             $query->whereDate('created_at', '>=', $filters['date_from']);
         }

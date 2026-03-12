@@ -7,6 +7,7 @@ use App\Services\RechargeService;
 use App\Http\Requests\InitiateRechargeRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 /**
  * @OA\Tag(
@@ -82,6 +83,16 @@ class RechargeController extends Controller
      */
     public function store(InitiateRechargeRequest $request): JsonResponse
     {
+        Log::info('RechargeController::store - incoming request from Flutter', [
+            'shop_id' => $this->shopId(),
+            'all_input' => $request->all(),
+            'validated' => $request->validated(),
+            'headers' => [
+                'content-type' => $request->header('Content-Type'),
+                'user-agent' => $request->header('User-Agent'),
+            ],
+        ]);
+
         $result = $this->rechargeService->initiateRecharge(
             $this->shopId(),
             $request->validated()

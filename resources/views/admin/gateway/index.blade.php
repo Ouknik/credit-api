@@ -19,7 +19,7 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-2 lg:grid-cols-5 gap-4" id="health-grid">
+    <div class="grid grid-cols-2 lg:grid-cols-6 gap-4" id="health-grid">
         {{-- Modem --}}
         <div class="bg-gray-50 rounded-lg p-4 text-center">
             <p class="text-xs text-gray-500 mb-1">Modem</p>
@@ -34,6 +34,11 @@
         <div class="bg-gray-50 rounded-lg p-4 text-center">
             <p class="text-xs text-gray-500 mb-1">Réseau (CREG)</p>
             <p id="h-network" class="text-lg font-bold text-gray-400">—</p>
+        </div>
+        {{-- SIM Balance --}}
+        <div class="bg-gray-50 rounded-lg p-4 text-center">
+            <p class="text-xs text-gray-500 mb-1">Solde SIM</p>
+            <p id="h-balance" class="text-lg font-bold text-gray-400">—</p>
         </div>
         {{-- Queue --}}
         <div class="bg-gray-50 rounded-lg p-4 text-center">
@@ -211,6 +216,16 @@ function updateUI(d) {
     const queue = document.getElementById('h-queue');
     queue.textContent = d.queue !== undefined ? d.queue : '?';
     queue.className = 'text-lg font-bold ' + (d.queue > 0 ? 'text-amber-500' : 'text-green-600');
+
+    // SIM Balance
+    const balance = document.getElementById('h-balance');
+    if (d.sim_balance !== null && d.sim_balance !== undefined) {
+        balance.textContent = d.sim_balance.toFixed(2) + ' MAD';
+        balance.className = 'text-lg font-bold ' + (d.sim_balance >= 50 ? 'text-green-600' : d.sim_balance >= 10 ? 'text-amber-500' : 'text-red-600');
+    } else {
+        balance.textContent = '—';
+        balance.className = 'text-lg font-bold text-gray-400';
+    }
 
     // Time
     document.getElementById('h-time').textContent = new Date().toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit', second:'2-digit'});

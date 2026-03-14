@@ -96,10 +96,13 @@ class GatewayCallbackController extends Controller
                 break;
 
             case 'no_signal':
-                // Non-terminal: just update status + save message, don't refund
-                $recharge->update(['status' => 'no_signal']);
-                Log::info('GatewayCallback: no_signal, waiting for retry', ['order_id' => $orderId]);
-                $this->broadcastUpdate($recharge);
+                // Terminal: Pi tried but had no signal — refund
+                $this->rechargeService->handleRechargeFailure($recharge, [
+                    'success' => false,
+                    'error'   => 'Gateway has no signal',
+                    'message' => $message,
+                    'source'  => 'gateway_callback',
+                ]);
                 break;
 
             case 'queued':

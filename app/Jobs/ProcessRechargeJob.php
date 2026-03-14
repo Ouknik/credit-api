@@ -13,16 +13,19 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Step 1: Send the recharge request to the Raspberry Pi gateway.
- * After queuing, dispatch CheckRechargeStatusJob to poll for result.
+ * Send the recharge request to the Raspberry Pi gateway ONCE.
+ *
+ * The Pi is the queue manager: it executes recharges one at a time,
+ * waits for the SMS confirmation, and sends back a callback.
+ *
+ * Laravel MUST NOT retry — the Pi handles all retry/confirmation logic.
  */
 class ProcessRechargeJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 3;
-    public int $backoff = 15;
-    public int $timeout = 60;
+    public int $tries = 1;      // Send ONCE — no automatic retry
+    public int $timeout = 30;   // Only needs to deliver to Pi, not wait for result
 
     public function __construct(
         public Recharge $recharge
@@ -30,18 +33,20 @@ class ProcessRechargeJob implements ShouldQueue
         $this->onQueue('recharges');
     }
 
-    public function handle(CadeauxGateway $gateway, RechargeService $rechargeService): void
+    public function handle(CadeauxGateway $gateway): void
     {
-        // Guard: if already sent to gateway (retry safety), skip re-send
         $this->recharge->refresh();
+
+        // Guard: already in terminal state — nothing to do
         if ($this->recharge->isTerminal()) {
             return;
         }
 
+        // Guard: already sent to gateway — do NOT re-send
         if ($this->recharge->gateway_response !== null) {
-            // Already sent to Pi — just ensure status checker is running
-            CheckRechargeStatusJob::dispatch($this->recharge)
-                ->delay(now()->addSeconds(10));
+            Log::info('ProcessRechargeJob: already sent to gateway, skipping', [
+                'recharge_id' => $this->recharge->id,
+            ]);
             return;
         }
 
@@ -54,69 +59,42 @@ class ProcessRechargeJob implements ShouldQueue
             'offer'          => $this->recharge->offer,
         ]);
 
-        try {
-            // Check gateway health before sending
-            $health = $gateway->checkHealth();
-            if (($health['status'] ?? '') === 'down') {
-                Log::warning('ProcessRechargeJob: gateway modem is down, retrying later', [
-                    'recharge_id' => $this->recharge->id,
-                    'health'      => $health,
-                ]);
-                throw new \RuntimeException('Gateway modem is down');
-            }
+        // Send recharge request to Raspberry Pi (fire and forget)
+        // The Pi will queue it locally, execute it, and send callback when done
+        $response = $gateway->sendRecharge(
+            orderId: $this->recharge->reference_code,
+            phone: $this->recharge->phone,
+            price: (float) $this->recharge->amount,
+            offer: $this->recharge->offer ?? '0',
+        );
 
-            // Send recharge request to Raspberry Pi
-            $response = $gateway->sendRecharge(
-                orderId: $this->recharge->reference_code,
-                phone: $this->recharge->phone,
-                price: (float) $this->recharge->amount,
-                offer: $this->recharge->offer ?? '0',
-            );
+        // Save gateway acknowledgement
+        $this->recharge->update([
+            'gateway_response' => $response,
+        ]);
 
-            // Save gateway response
-            $this->recharge->update([
-                'gateway_response' => $response,
-            ]);
-
-            Log::info('ProcessRechargeJob: queued on gateway', [
-                'recharge_id' => $this->recharge->id,
-                'queue_pos'   => $response['queue'] ?? null,
-                'status'      => $response['status'] ?? 'unknown',
-            ]);
-
-            // If Pi says duplicate, it already has it — just poll status
-            if (($response['status'] ?? '') === 'duplicate') {
-                Log::info('ProcessRechargeJob: Pi reports duplicate, skipping to status poll', [
-                    'recharge_id' => $this->recharge->id,
-                ]);
-            }
-
-            // Dispatch status checker — starts polling after 10 seconds
-            CheckRechargeStatusJob::dispatch($this->recharge)
-                ->delay(now()->addSeconds(10));
-
-        } catch (\Exception $e) {
-            Log::error('ProcessRechargeJob: gateway error', [
-                'recharge_id' => $this->recharge->id,
-                'error'       => $e->getMessage(),
-            ]);
-
-            throw $e; // Re-throw to trigger retry
-        }
+        Log::info('ProcessRechargeJob: delivered to gateway', [
+            'recharge_id' => $this->recharge->id,
+            'queue_pos'   => $response['queue'] ?? null,
+            'status'      => $response['status'] ?? 'unknown',
+        ]);
     }
 
+    /**
+     * Called if delivering to the Pi fails (network error, Pi down).
+     * Refund the shop balance since we could not reach the gateway.
+     */
     public function failed(\Throwable $exception): void
     {
-        Log::error('ProcessRechargeJob: failed after all retries', [
+        Log::error('ProcessRechargeJob: failed to deliver to gateway', [
             'recharge_id' => $this->recharge->id,
             'error'       => $exception->getMessage(),
         ]);
 
-        // Refund balance after all retries exhausted
         $rechargeService = app(RechargeService::class);
         $rechargeService->handleRechargeFailure($this->recharge, [
             'success' => false,
-            'error'   => 'Gateway unreachable after maximum retries: ' . $exception->getMessage(),
+            'error'   => 'Gateway unreachable: ' . $exception->getMessage(),
         ]);
     }
 }

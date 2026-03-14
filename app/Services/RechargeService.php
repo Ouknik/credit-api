@@ -8,10 +8,10 @@ use App\Models\RechargeTransaction;
 use App\Repositories\ShopRepository;
 use App\Repositories\RechargeRepository;
 use App\Repositories\CustomerRepository;
-use App\Jobs\ProcessRechargeJob;
 use App\Models\AuditLog;
 use App\Events\RechargeUpdated;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
@@ -22,6 +22,7 @@ class RechargeService
         private RechargeRepository $rechargeRepository,
         private CustomerRepository $customerRepository,
         private WalletService $walletService,
+        private CadeauxGateway $gateway,
     ) {}
 
     public function getRechargesByShop(string $shopId, int $perPage = 15, array $filters = []): LengthAwarePaginator
@@ -44,37 +45,24 @@ class RechargeService
             }
         }
 
-        return DB::transaction(function () use ($shopId, $data) {
-            // Lock shop row to prevent race conditions
+        // Step 1: Create recharge + deduct balance (atomic)
+        $recharge = DB::transaction(function () use ($shopId, $data) {
             $shop = $this->shopRepository->lockForUpdate($shopId);
 
             if (!$shop) {
-                return [
-                    'success' => false,
-                    'message' => 'Shop not found',
-                ];
+                return ['error' => 'Shop not found'];
             }
 
-            // Check shop status
             if (!$shop->isActive()) {
-                return [
-                    'success' => false,
-                    'message' => 'Shop account is suspended',
-                ];
+                return ['error' => 'Shop account is suspended'];
             }
 
-            // Check balance
             if (!$shop->hasEnoughBalance($data['amount'])) {
-                return [
-                    'success' => false,
-                    'message' => 'Insufficient balance',
-                ];
+                return ['error' => 'Insufficient balance'];
             }
 
-            // Generate unique reference code
             $referenceCode = $this->generateReferenceCode();
 
-            // Create recharge record first (so we have the reference)
             $recharge = $this->rechargeRepository->create([
                 'shop_id' => $shopId,
                 'customer_id' => $data['customer_id'] ?? null,
@@ -88,7 +76,6 @@ class RechargeService
                 'idempotency_key' => $data['idempotency_key'] ?? null,
             ]);
 
-            // Deduct balance via WalletService (atomic, creates WalletTransaction)
             $this->walletService->deduct(
                 shopId: $shopId,
                 amount: $data['amount'],
@@ -106,15 +93,55 @@ class RechargeService
                 'balance_after' => $shop->balance,
             ]);
 
-            // Dispatch job to process recharge
-            ProcessRechargeJob::dispatch($recharge);
+            return $recharge;
+        });
+
+        // Transaction returned an error array
+        if (is_array($recharge) && isset($recharge['error'])) {
+            return ['success' => false, 'message' => $recharge['error']];
+        }
+
+        // Step 2: Send to Pi DIRECTLY (outside transaction — no DB lock held)
+        try {
+            $response = $this->gateway->sendRecharge(
+                orderId: $recharge->reference_code,
+                phone: $recharge->phone,
+                price: (float) $recharge->amount,
+                offer: $recharge->offer ?? '0',
+            );
+
+            $recharge->update(['gateway_response' => $response]);
+
+            Log::info('RechargeService: delivered to gateway', [
+                'recharge_id' => $recharge->id,
+                'queue_pos'   => $response['queue'] ?? null,
+                'status'      => $response['status'] ?? 'unknown',
+            ]);
 
             return [
                 'success' => true,
                 'recharge' => $recharge,
                 'message' => 'Recharge initiated successfully',
             ];
-        });
+
+        } catch (\Exception $e) {
+            // Pi unreachable — refund immediately
+            Log::error('RechargeService: gateway unreachable, refunding', [
+                'recharge_id' => $recharge->id,
+                'error'       => $e->getMessage(),
+            ]);
+
+            $this->handleRechargeFailure($recharge, [
+                'success' => false,
+                'error'   => 'Gateway unreachable: ' . $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'recharge' => $recharge->refresh(),
+                'message' => 'Gateway unreachable, balance refunded',
+            ];
+        }
     }
 
     public function handleRechargeSuccess(Recharge $recharge, array $response): void

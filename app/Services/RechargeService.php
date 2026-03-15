@@ -108,6 +108,7 @@ class RechargeService
                 phone: $recharge->phone,
                 price: (float) $recharge->amount,
                 offer: $recharge->offer ?? '0',
+                operator: $recharge->operator,
             );
 
             $recharge->update(['gateway_response' => $response]);

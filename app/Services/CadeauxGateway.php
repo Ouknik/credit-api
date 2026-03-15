@@ -31,17 +31,29 @@ class CadeauxGateway
     // ════════════════════════════════════════════════
 
     /**
+     * Map Flutter operator names to Pi carrier names.
+     */
+    private const OPERATOR_TO_CARRIER = [
+        'maroc_telecom' => 'orange',
+        'orange'        => 'orange',
+        'inwi'          => 'inwi',
+    ];
+
+    /**
      * @param  string  $orderId   Unique order reference
      * @param  string  $phone     Target phone number
      * @param  float   $price     Amount in MAD
      * @param  string  $offer     Offer code (e.g. "3")
-     * @return array              ['order_id', 'queue', 'status']
+     * @param  string  $operator  Operator name from Flutter (maroc_telecom, orange, inwi)
+     * @return array              ['order_id', 'queue', 'status', 'carrier']
      *
      * @throws RuntimeException
      */
-    public function sendRecharge(string $orderId, string $phone, float $price, string $offer): array
+    public function sendRecharge(string $orderId, string $phone, float $price, string $offer, string $operator = 'orange'): array
     {
-        Log::info('CadeauxGateway: sending recharge', compact('orderId', 'phone', 'price', 'offer'));
+        $carrier = self::OPERATOR_TO_CARRIER[$operator] ?? 'orange';
+
+        Log::info('CadeauxGateway: sending recharge', compact('orderId', 'phone', 'price', 'offer', 'operator', 'carrier'));
 
         try {
             $response = Http::timeout($this->timeout)
@@ -55,6 +67,7 @@ class CadeauxGateway
                     'phone'    => $phone,
                     'price'    => (string) $price,
                     'offer'    => $offer,
+                    'carrier'  => $carrier,
                 ]);
 
             if (!$response->successful()) {

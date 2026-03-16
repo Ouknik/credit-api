@@ -10,6 +10,7 @@ use App\Http\Requests\RegisterRequest;
 use App\Http\Requests\SendOtpRequest;
 use App\Http\Requests\VerifyOtpRequest;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 
 class AuthController extends Controller
 {
@@ -24,9 +25,11 @@ class AuthController extends Controller
     public function sendOtp(SendOtpRequest $request): JsonResponse
     {
         try {
+            Log::info('AuthController: sendOtp called', ['phone' => $request->phone]);
             $this->otpService->sendOtp($request->phone);
             return $this->success(null, 'OTP sent successfully via WhatsApp');
         } catch (\RuntimeException $e) {
+            Log::error('AuthController: sendOtp failed', ['phone' => $request->phone, 'error' => $e->getMessage()]);
             return $this->error($e->getMessage(), 429);
         }
     }
@@ -77,7 +80,7 @@ class AuthController extends Controller
         }
 
         $result = $this->authService->loginByPhone($request->phone);
-
+        Log::info('AuthController: login attempt', ['phone' => $request->phone, 'result' => $result ? 'success' : 'failure']);
         if (!$result) {
             return $this->error('Phone number not registered or account suspended', 401);
         }

@@ -46,4 +46,16 @@ return [
         'timeout'  => env('CADEAUX_TIMEOUT', 30),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | WhatsApp OTP Service (whatsotp.me)
+    |--------------------------------------------------------------------------
+    */
+    'whatsotp' => [
+        'base_url'   => env('WHATSOTP_BASE_URL', 'https://whatsotp.me/api'),
+        'api_key'    => env('WHATSOTP_API_KEY', ''),
+        'api_secret' => env('WHATSOTP_API_SECRET', ''),
+        'timeout'    => env('WHATSOTP_TIMEOUT', 15),
+    ],
+
 ];

@@ -159,8 +159,8 @@ class RechargeController extends Controller
     {
         $operators = [
             [
-                'id'     => 'maroc_telecom',
-                'name'   => 'Maroc Telecom',
+                'id'     => 'orange',
+                'name'   => 'Orange',
                 'offers' => [
                     ['offer' => '1', 'amount' => 5,   'label' => '5 DH'],
                     ['offer' => '2', 'amount' => 10,  'label' => '10 DH'],
@@ -173,18 +173,6 @@ class RechargeController extends Controller
             [
                 'id'     => 'inwi',
                 'name'   => 'Inwi',
-                'offers' => [
-                    ['offer' => '1', 'amount' => 5,   'label' => '5 DH'],
-                    ['offer' => '2', 'amount' => 10,  'label' => '10 DH'],
-                    ['offer' => '3', 'amount' => 20,  'label' => '20 DH'],
-                    ['offer' => '4', 'amount' => 50,  'label' => '50 DH'],
-                    ['offer' => '5', 'amount' => 100, 'label' => '100 DH'],
-                    ['offer' => '6', 'amount' => 200, 'label' => '200 DH'],
-                ],
-            ],
-            [
-                'id'     => 'orange',
-                'name'   => 'Orange',
                 'offers' => [
                     ['offer' => '1', 'amount' => 5,   'label' => '5 DH'],
                     ['offer' => '2', 'amount' => 10,  'label' => '10 DH'],

@@ -17,6 +17,11 @@ class ShopRepository extends BaseRepository
         return $this->model->where('email', $email)->first();
     }
 
+    public function findByPhone(string $phone): ?Shop
+    {
+        return $this->model->where('phone', $phone)->first();
+    }
+
     public function lockForUpdate(string $id): ?Shop
     {
         return $this->model->lockForUpdate()->find($id);

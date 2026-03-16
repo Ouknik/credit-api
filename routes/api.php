@@ -23,6 +23,8 @@ Route::post('gateway/callback', GatewayCallbackController::class);
 
 // Public routes
 Route::prefix('auth')->group(function () {
+    Route::post('otp/send', [AuthController::class, 'sendOtp']);
+    Route::post('otp/verify', [AuthController::class, 'verifyOtp']);
     Route::post('register', [AuthController::class, 'register']);
     Route::post('login', [AuthController::class, 'login']);
 });

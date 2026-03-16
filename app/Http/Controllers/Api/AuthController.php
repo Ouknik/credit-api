@@ -4,96 +4,74 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\AuthService;
+use App\Services\WhatsAppOtpService;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
+use App\Http\Requests\SendOtpRequest;
+use App\Http\Requests\VerifyOtpRequest;
 use Illuminate\Http\JsonResponse;
 
-/**
- * @OA\Tag(
- *     name="Authentication",
- *     description="API Endpoints for authentication"
- * )
- */
 class AuthController extends Controller
 {
     public function __construct(
-        private AuthService $authService
+        private AuthService $authService,
+        private WhatsAppOtpService $otpService,
     ) {}
 
     /**
-     * @OA\Post(
-     *     path="/auth/register",
-     *     summary="Register a new shop",
-     *     tags={"Authentication"},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"name", "email", "password", "password_confirmation"},
-     *             @OA\Property(property="name", type="string", example="My Shop"),
-     *             @OA\Property(property="phone", type="string", example="+212600000000"),
-     *             @OA\Property(property="email", type="string", format="email", example="shop@example.com"),
-     *             @OA\Property(property="password", type="string", format="password", example="password123"),
-     *             @OA\Property(property="password_confirmation", type="string", format="password", example="password123")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Shop registered successfully",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Shop registered successfully"),
-     *             @OA\Property(property="data", type="object",
-     *                 @OA\Property(property="shop", ref="#/components/schemas/Shop"),
-     *                 @OA\Property(property="token", type="string"),
-     *                 @OA\Property(property="token_type", type="string", example="bearer"),
-     *                 @OA\Property(property="expires_in", type="integer")
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(response=422, description="Validation error")
-     * )
+     * Send OTP to phone number via WhatsApp.
+     */
+    public function sendOtp(SendOtpRequest $request): JsonResponse
+    {
+        try {
+            $this->otpService->sendOtp($request->phone);
+            return $this->success(null, 'OTP sent successfully via WhatsApp');
+        } catch (\RuntimeException $e) {
+            return $this->error($e->getMessage(), 429);
+        }
+    }
+
+    /**
+     * Verify OTP code. Returns a verification token for registration.
+     */
+    public function verifyOtp(VerifyOtpRequest $request): JsonResponse
+    {
+        try {
+            $token = $this->otpService->verifyOtp($request->phone, $request->otp);
+            return $this->success(
+                ['verification_token' => $token],
+                'OTP verified successfully'
+            );
+        } catch (\RuntimeException $e) {
+            return $this->error($e->getMessage(), 400);
+        }
+    }
+
+    /**
+     * Register a new shop (requires OTP verification first).
      */
     public function register(RegisterRequest $request): JsonResponse
     {
-        $result = $this->authService->register($request->validated());
-        
+        $data = $request->validated();
+
+        if (!$this->otpService->isPhoneVerified($data['phone'], $data['verification_token'])) {
+            return $this->error('Phone number has not been verified. Please complete OTP verification first.', 403);
+        }
+
+        $result = $this->authService->register($data);
+
+        $this->otpService->consumeVerification($data['phone'], $data['verification_token']);
+
         return $this->success($result, 'Shop registered successfully', 201);
     }
 
     /**
-     * @OA\Post(
-     *     path="/auth/login",
-     *     summary="Login to shop account",
-     *     tags={"Authentication"},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"email", "password"},
-     *             @OA\Property(property="email", type="string", format="email", example="shop@example.com"),
-     *             @OA\Property(property="password", type="string", format="password", example="password123")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Login successful",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="message", type="string", example="Login successful"),
-     *             @OA\Property(property="data", type="object",
-     *                 @OA\Property(property="shop", ref="#/components/schemas/Shop"),
-     *                 @OA\Property(property="token", type="string"),
-     *                 @OA\Property(property="token_type", type="string", example="bearer"),
-     *                 @OA\Property(property="expires_in", type="integer")
-     *             )
-     *         )
-     *     ),
-     *     @OA\Response(response=401, description="Invalid credentials")
-     * )
+     * Login with phone + password.
      */
     public function login(LoginRequest $request): JsonResponse
     {
         $result = $this->authService->login(
-            $request->email,
+            $request->phone,
             $request->password
         );
 
@@ -104,64 +82,21 @@ class AuthController extends Controller
         return $this->success($result, 'Login successful');
     }
 
-    /**
-     * @OA\Post(
-     *     path="/auth/logout",
-     *     summary="Logout from shop account",
-     *     tags={"Authentication"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Logged out successfully"
-     *     )
-     * )
-     */
     public function logout(): JsonResponse
     {
         $this->authService->logout();
-        
         return $this->success(null, 'Logged out successfully');
     }
 
-    /**
-     * @OA\Post(
-     *     path="/auth/refresh",
-     *     summary="Refresh JWT token",
-     *     tags={"Authentication"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Token refreshed successfully"
-     *     )
-     * )
-     */
     public function refresh(): JsonResponse
     {
         $result = $this->authService->refresh();
-        
         return $this->success($result, 'Token refreshed successfully');
     }
 
-    /**
-     * @OA\Get(
-     *     path="/auth/me",
-     *     summary="Get current shop information",
-     *     tags={"Authentication"},
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Response(
-     *         response=200,
-     *         description="Shop information retrieved",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(property="data", ref="#/components/schemas/Shop")
-     *         )
-     *     )
-     * )
-     */
     public function me(): JsonResponse
     {
         $shop = $this->authService->me();
-        
         return $this->success($shop);
     }
 }

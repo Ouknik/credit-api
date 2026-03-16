@@ -34,9 +34,8 @@ class CadeauxGateway
      * Map Flutter operator names to Pi carrier names.
      */
     private const OPERATOR_TO_CARRIER = [
-        'maroc_telecom' => 'orange',
-        'orange'        => 'orange',
-        'inwi'          => 'inwi',
+        'orange' => 'orange',
+        'inwi'   => 'inwi',
     ];
 
     /**

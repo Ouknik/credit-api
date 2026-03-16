@@ -11,7 +11,7 @@ use Tymon\JWTAuth\Contracts\JWTSubject;
 /**
  * @OA\Schema(
  *     schema="Shop",
- *     required={"id", "name", "email", "status"},
+ *     required={"id", "name", "phone", "status"},
  *     @OA\Property(property="id", type="string", format="uuid"),
  *     @OA\Property(property="name", type="string"),
  *     @OA\Property(property="phone", type="string"),
@@ -53,7 +53,7 @@ class Shop extends Authenticatable implements JWTSubject
     {
         return [
             'shop_id' => $this->id,
-            'email' => $this->email,
+            'phone' => $this->phone,
         ];
     }
 

@@ -17,18 +17,18 @@ class AuthService
     public function register(array $data): array
     {
         $shop = $this->shopRepository->create([
-            'name' => $data['name'],
-            'phone' => $data['phone'] ?? null,
-            'email' => $data['email'],
+            'name'     => $data['name'],
+            'phone'    => $data['phone'],
+            'email'    => null,
             'password' => $data['password'],
-            'balance' => 0,
-            'status' => 'active',
+            'balance'  => 0,
+            'status'   => 'active',
         ]);
 
         $token = JWTAuth::fromUser($shop);
 
         AuditLog::log($shop->id, 'shop.registered', [
-            'email' => $shop->email,
+            'phone' => $shop->phone,
         ]);
 
         return [
@@ -39,9 +39,9 @@ class AuthService
         ];
     }
 
-    public function login(string $email, string $password): ?array
+    public function login(string $phone, string $password): ?array
     {
-        $shop = $this->shopRepository->findByEmail($email);
+        $shop = $this->shopRepository->findByPhone($phone);
 
         if (!$shop || !Hash::check($password, $shop->password)) {
             return null;
@@ -54,7 +54,7 @@ class AuthService
         $token = JWTAuth::fromUser($shop);
 
         AuditLog::log($shop->id, 'shop.login', [
-            'email' => $shop->email,
+            'phone' => $shop->phone,
         ]);
 
         return [

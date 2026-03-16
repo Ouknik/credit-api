@@ -26,10 +26,11 @@ class WhatsAppOtpService
 
     /**
      * Send OTP to a phone number via WhatsApp.
+     * Returns the OTP code from the API response.
      *
      * @throws RuntimeException
      */
-    public function sendOtp(string $phone): void
+    public function sendOtp(string $phone): string
     {
         $rateLimitKey = 'otp_send:' . $phone;
         if (RateLimiter::tooManyAttempts($rateLimitKey, 3)) {
@@ -62,15 +63,23 @@ class WhatsAppOtpService
                 );
             }
 
+            $otp = $response->json('otp');
+
             RateLimiter::hit($rateLimitKey, 300);
+
+            // Clean old OTPs for this phone, then store the new one
+            OtpVerification::where('phone', $phone)->where('verified', false)->delete();
 
             OtpVerification::create([
                 'phone'      => $phone,
+                'otp'        => $otp,
                 'verified'   => false,
                 'expires_at' => now()->addMinutes(10),
             ]);
 
             Log::info('WhatsAppOtp: OTP sent successfully', ['phone' => $phone]);
+
+            return $otp;
         } catch (RuntimeException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -80,51 +89,33 @@ class WhatsAppOtpService
     }
 
     /**
-     * Verify an OTP code. Returns a verification token on success.
+     * Verify an OTP code against the stored OTP in database.
      *
      * @throws RuntimeException
      */
     public function verifyOtp(string $phone, string $otp): string
     {
-        Log::info('WhatsAppOtp: verifying OTP', ['phone' => $phone]);
+        $record = OtpVerification::where('phone', $phone)
+            ->where('otp', $otp)
+            ->where('verified', false)
+            ->latest()
+            ->first();
 
-        try {
-            $response = Http::timeout($this->timeout)
-                ->withHeaders([
-                    'X-API-Key'    => $this->apiKey,
-                    'X-API-Secret' => $this->apiSecret,
-                    'Content-Type' => 'application/json',
-                ])
-                ->post("{$this->baseUrl}/otp/verify", [
-                    'phone' => $phone,
-                    'otp'   => $otp,
-                ]);
-
-            if (!$response->successful()) {
-                throw new RuntimeException('Invalid or expired OTP code.');
-            }
-
-            $token = Str::random(64);
-
-            OtpVerification::where('phone', $phone)
-                ->where('verified', false)
-                ->latest()
-                ->first()
-                ?->update([
-                    'verified'           => true,
-                    'verification_token' => $token,
-                    'expires_at'         => now()->addMinutes(10),
-                ]);
-
-            Log::info('WhatsAppOtp: OTP verified', ['phone' => $phone]);
-
-            return $token;
-        } catch (RuntimeException $e) {
-            throw $e;
-        } catch (\Exception $e) {
-            Log::error('WhatsAppOtp: verify error', ['error' => $e->getMessage()]);
-            throw new RuntimeException("OTP service connection failed: {$e->getMessage()}");
+        if (!$record || $record->isExpired()) {
+            throw new RuntimeException('Invalid or expired OTP code.');
         }
+
+        $token = Str::random(64);
+
+        $record->update([
+            'verified'           => true,
+            'verification_token' => $token,
+            'expires_at'         => now()->addMinutes(10),
+        ]);
+
+        Log::info('WhatsAppOtp: OTP verified', ['phone' => $phone]);
+
+        return $token;
     }
 
     /**

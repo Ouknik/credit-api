@@ -20,14 +20,14 @@ class AuthController extends Controller
     ) {}
 
     /**
-     * Send OTP to phone number via WhatsApp.
+     * Send OTP to phone number via WhatsApp. Returns OTP to client for local verification.
      */
     public function sendOtp(SendOtpRequest $request): JsonResponse
     {
         try {
             Log::info('AuthController: sendOtp called', ['phone' => $request->phone]);
-            $this->otpService->sendOtp($request->phone);
-            return $this->success(null, 'OTP sent successfully via WhatsApp');
+            $otp = $this->otpService->sendOtp($request->phone);
+            return $this->success(['otp' => $otp], 'OTP sent successfully via WhatsApp');
         } catch (\RuntimeException $e) {
             Log::error('AuthController: sendOtp failed', ['phone' => $request->phone, 'error' => $e->getMessage()]);
             return $this->error($e->getMessage(), 429);
@@ -69,16 +69,10 @@ class AuthController extends Controller
     }
 
     /**
-     * Login with phone + OTP (no password).
+     * Login with phone. OTP verification is done client-side.
      */
     public function login(LoginRequest $request): JsonResponse
     {
-        try {
-            $token = $this->otpService->verifyOtp($request->phone, $request->otp);
-        } catch (\RuntimeException $e) {
-            return $this->error($e->getMessage(), 401);
-        }
-
         $result = $this->authService->loginByPhone($request->phone);
         Log::info('AuthController: login attempt', ['phone' => $request->phone, 'result' => $result ? 'success' : 'failure']);
         if (!$result) {

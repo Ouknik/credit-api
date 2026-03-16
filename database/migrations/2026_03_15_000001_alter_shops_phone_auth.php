@@ -18,8 +18,13 @@ return new class extends Migration
         \DB::statement("ALTER TABLE `shops` MODIFY `phone` VARCHAR(20) NULL");
         \DB::statement("ALTER TABLE `shops` MODIFY `phone` VARCHAR(20) NOT NULL");
 
+        // Drop email unique index if it exists (name may vary)
+        $emailIndexes = \DB::select("SHOW INDEX FROM `shops` WHERE Column_name = 'email' AND Non_unique = 0");
+        foreach ($emailIndexes as $idx) {
+            \DB::statement("ALTER TABLE `shops` DROP INDEX `{$idx->Key_name}`");
+        }
+
         Schema::table('shops', function (Blueprint $table) {
-            $table->dropUnique(['email']);
             $table->string('email')->nullable()->change();
             $table->unique('phone');
             $table->index('phone');

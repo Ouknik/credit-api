@@ -8,12 +8,19 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // First truncate long phone values while column is still varchar(255)
+        \DB::table('shops')->update([
+            'phone' => \DB::raw("LEFT(TRIM(COALESCE(phone, '0000000000')), 20)"),
+        ]);
+        \DB::table('shops')->where('phone', '')->update(['phone' => '0000000000']);
+
+        // Alter column in two steps to avoid strict-mode truncation errors
+        \DB::statement("ALTER TABLE `shops` MODIFY `phone` VARCHAR(20) NULL");
+        \DB::statement("ALTER TABLE `shops` MODIFY `phone` VARCHAR(20) NOT NULL");
+
         Schema::table('shops', function (Blueprint $table) {
             $table->dropUnique(['email']);
-
             $table->string('email')->nullable()->change();
-
-            $table->string('phone', 20)->nullable(false)->change();
             $table->unique('phone');
             $table->index('phone');
         });

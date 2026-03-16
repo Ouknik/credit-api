@@ -26,7 +26,8 @@ class WhatsAppOtpService
 
     /**
      * Send OTP to a phone number via WhatsApp.
-     * Returns the OTP code from the API response.
+     * Generates OTP locally, sends it as custom OTP to WhatsApp API, returns it to client.
+     * No database interaction - OTP comparison is done client-side.
      *
      * @throws RuntimeException
      */
@@ -42,6 +43,8 @@ class WhatsAppOtpService
 
         Log::info('WhatsAppOtp: sending OTP', ['phone' => $phone]);
 
+        $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
         try {
             $response = Http::timeout($this->timeout)
                 ->withHeaders([
@@ -51,6 +54,7 @@ class WhatsAppOtpService
                 ])
                 ->post("{$this->baseUrl}/otp/send", [
                     'phone' => $phone,
+                    'otp'   => $otp,
                 ]);
 
             if (!$response->successful()) {
@@ -63,19 +67,7 @@ class WhatsAppOtpService
                 );
             }
 
-            $otp = $response->json('otp');
-
             RateLimiter::hit($rateLimitKey, 300);
-
-            // Clean old OTPs for this phone, then store the new one
-            OtpVerification::where('phone', $phone)->where('verified', false)->delete();
-
-            OtpVerification::create([
-                'phone'      => $phone,
-                'otp'        => $otp,
-                'verified'   => false,
-                'expires_at' => now()->addMinutes(10),
-            ]);
 
             Log::info('WhatsAppOtp: OTP sent successfully', ['phone' => $phone]);
 
@@ -89,33 +81,52 @@ class WhatsAppOtpService
     }
 
     /**
-     * Verify an OTP code against the stored OTP in database.
+     * Verify an OTP code via WhatsApp API. Returns a verification token on success.
+     * Used by the registration flow.
      *
      * @throws RuntimeException
      */
     public function verifyOtp(string $phone, string $otp): string
     {
-        $record = OtpVerification::where('phone', $phone)
-            ->where('otp', $otp)
-            ->where('verified', false)
-            ->latest()
-            ->first();
+        Log::info('WhatsAppOtp: verifying OTP', ['phone' => $phone]);
 
-        if (!$record || $record->isExpired()) {
-            throw new RuntimeException('Invalid or expired OTP code.');
+        try {
+            $response = Http::timeout($this->timeout)
+                ->withHeaders([
+                    'X-API-Key'    => $this->apiKey,
+                    'X-API-Secret' => $this->apiSecret,
+                    'Content-Type' => 'application/json',
+                ])
+                ->post("{$this->baseUrl}/otp/verify", [
+                    'phone' => $phone,
+                    'otp'   => $otp,
+                ]);
+
+            if (!$response->successful()) {
+                throw new RuntimeException('Invalid or expired OTP code.');
+            }
+
+            $token = Str::random(64);
+
+            // Clean old records for this phone, then store the verified one
+            OtpVerification::where('phone', $phone)->where('verified', false)->delete();
+
+            OtpVerification::create([
+                'phone'              => $phone,
+                'verified'           => true,
+                'verification_token' => $token,
+                'expires_at'         => now()->addMinutes(10),
+            ]);
+
+            Log::info('WhatsAppOtp: OTP verified', ['phone' => $phone]);
+
+            return $token;
+        } catch (RuntimeException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('WhatsAppOtp: verify error', ['error' => $e->getMessage()]);
+            throw new RuntimeException("OTP service connection failed: {$e->getMessage()}");
         }
-
-        $token = Str::random(64);
-
-        $record->update([
-            'verified'           => true,
-            'verification_token' => $token,
-            'expires_at'         => now()->addMinutes(10),
-        ]);
-
-        Log::info('WhatsAppOtp: OTP verified', ['phone' => $phone]);
-
-        return $token;
     }
 
     /**

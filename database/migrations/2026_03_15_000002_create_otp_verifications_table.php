@@ -11,7 +11,6 @@ return new class extends Migration
         Schema::create('otp_verifications', function (Blueprint $table) {
             $table->id();
             $table->string('phone', 20)->index();
-            $table->string('otp', 8)->nullable();
             $table->boolean('verified')->default(false);
             $table->string('verification_token', 64)->nullable()->unique();
             $table->timestamp('expires_at');

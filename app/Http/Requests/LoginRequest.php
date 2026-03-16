@@ -14,15 +14,16 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'phone'    => ['required', 'string', 'regex:/^212[5-7]\d{8}$/'],
-            'password' => ['required', 'string'],
+            'phone' => ['required', 'string', 'regex:/^212[5-7]\d{8}$/'],
+            'otp'   => ['required', 'string', 'min:4', 'max:8'],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'phone.regex' => 'Phone must be in format 212XXXXXXXXX.',
+            'phone.regex'  => 'Phone must be in format 212XXXXXXXXX.',
+            'otp.required' => 'Please enter the OTP code.',
         ];
     }
 }

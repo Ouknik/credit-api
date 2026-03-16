@@ -5,7 +5,7 @@ namespace App\Services;
 use App\Models\Shop;
 use App\Repositories\ShopRepository;
 use App\Models\AuditLog;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Tymon\JWTAuth\Facades\JWTAuth;
 
 class AuthService
@@ -20,7 +20,7 @@ class AuthService
             'name'     => $data['name'],
             'phone'    => $data['phone'],
             'email'    => null,
-            'password' => $data['password'],
+            'password' => bcrypt(Str::random(32)), // placeholder, not used for auth
             'balance'  => 0,
             'status'   => 'active',
         ]);
@@ -39,15 +39,11 @@ class AuthService
         ];
     }
 
-    public function login(string $phone, string $password): ?array
+    public function loginByPhone(string $phone): ?array
     {
         $shop = $this->shopRepository->findByPhone($phone);
 
-        if (!$shop || !Hash::check($password, $shop->password)) {
-            return null;
-        }
-
-        if (!$shop->isActive()) {
+        if (!$shop || !$shop->isActive()) {
             return null;
         }
 

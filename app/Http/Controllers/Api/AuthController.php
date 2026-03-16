@@ -66,17 +66,20 @@ class AuthController extends Controller
     }
 
     /**
-     * Login with phone + password.
+     * Login with phone + OTP (no password).
      */
     public function login(LoginRequest $request): JsonResponse
     {
-        $result = $this->authService->login(
-            $request->phone,
-            $request->password
-        );
+        try {
+            $token = $this->otpService->verifyOtp($request->phone, $request->otp);
+        } catch (\RuntimeException $e) {
+            return $this->error($e->getMessage(), 401);
+        }
+
+        $result = $this->authService->loginByPhone($request->phone);
 
         if (!$result) {
-            return $this->error('Invalid credentials or account suspended', 401);
+            return $this->error('Phone number not registered or account suspended', 401);
         }
 
         return $this->success($result, 'Login successful');

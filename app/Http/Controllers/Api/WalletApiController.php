@@ -24,6 +24,16 @@ class WalletApiController extends Controller
 
         $transactions = $query->paginate($request->input('per_page', 20));
 
+        // Append recharge status for recharge/refund transactions
+        $transactions->getCollection()->transform(function ($tx) {
+            if (in_array($tx->type, ['recharge', 'refund']) && $tx->reference) {
+                $recharge = $tx->recharge;
+                $tx->setAttribute('recharge_status', $recharge?->status);
+            }
+            unset($tx->recharge);
+            return $tx;
+        });
+
         return $this->success($transactions);
     }
 }

@@ -57,6 +57,11 @@ class WalletTransaction extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function recharge(): BelongsTo
+    {
+        return $this->belongsTo(Recharge::class, 'reference', 'reference_code');
+    }
+
     // ── Type Helpers ───────────────────────────────
 
     public function isDeposit(): bool

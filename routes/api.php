@@ -27,6 +27,8 @@ Route::prefix('auth')->group(function () {
     Route::post('otp/verify', [AuthController::class, 'verifyOtp']);
     Route::post('register', [AuthController::class, 'register']);
     Route::post('login', [AuthController::class, 'login']);
+    // Keep refresh outside jwt.auth so expired (but refreshable) tokens can renew session.
+    Route::post('refresh', [AuthController::class, 'refresh']);
 });
 
 // Protected routes
@@ -35,7 +37,6 @@ Route::middleware(['jwt.auth'])->group(function () {
     // Auth routes
     Route::prefix('auth')->group(function () {
         Route::post('logout', [AuthController::class, 'logout']);
-        Route::post('refresh', [AuthController::class, 'refresh']);
         Route::get('me', [AuthController::class, 'me']);
     });
 

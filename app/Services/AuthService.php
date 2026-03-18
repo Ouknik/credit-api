@@ -35,7 +35,7 @@ class AuthService
             'shop' => $shop,
             'token' => $token,
             'token_type' => 'bearer',
-            'expires_in' => config('jwt.ttl') * 60,
+            'expires_in' => $this->tokenExpiresInSeconds(),
         ];
     }
 
@@ -57,7 +57,7 @@ class AuthService
             'shop' => $shop,
             'token' => $token,
             'token_type' => 'bearer',
-            'expires_in' => config('jwt.ttl') * 60,
+            'expires_in' => $this->tokenExpiresInSeconds(),
         ];
     }
 
@@ -74,19 +74,29 @@ class AuthService
 
     public function refresh(): array
     {
-        $shop = auth()->user();
-        $token = JWTAuth::refresh(JWTAuth::getToken());
+        $oldToken = JWTAuth::getToken();
+        $token = JWTAuth::refresh($oldToken);
+        $shop = JWTAuth::setToken($token)->toUser();
+
+        if (!$shop || !$shop->isActive()) {
+            throw new \RuntimeException('Unable to refresh session');
+        }
         
         return [
             'shop' => $shop,
             'token' => $token,
             'token_type' => 'bearer',
-            'expires_in' => config('jwt.ttl') * 60,
+            'expires_in' => $this->tokenExpiresInSeconds(),
         ];
     }
 
     public function me(): ?Shop
     {
         return auth()->user();
+    }
+
+    private function tokenExpiresInSeconds(): int
+    {
+        return (int) config('jwt.ttl', 60) * 60;
     }
 }

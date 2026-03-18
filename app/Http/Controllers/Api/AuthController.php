@@ -11,6 +11,9 @@ use App\Http\Requests\SendOtpRequest;
 use App\Http\Requests\VerifyOtpRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
+use Tymon\JWTAuth\Exceptions\JWTException;
+use Tymon\JWTAuth\Exceptions\TokenExpiredException;
+use Tymon\JWTAuth\Exceptions\TokenInvalidException;
 
 class AuthController extends Controller
 {
@@ -90,8 +93,14 @@ class AuthController extends Controller
 
     public function refresh(): JsonResponse
     {
-        $result = $this->authService->refresh();
-        return $this->success($result, 'Token refreshed successfully');
+        try {
+            $result = $this->authService->refresh();
+            return $this->success($result, 'Token refreshed successfully');
+        } catch (TokenExpiredException|TokenInvalidException|JWTException $e) {
+            return $this->error('Session expired. Please login again.', 401);
+        } catch (\RuntimeException $e) {
+            return $this->error($e->getMessage(), 401);
+        }
     }
 
     public function me(): JsonResponse

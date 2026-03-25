@@ -145,6 +145,82 @@ class RechargeService
         }
     }
 
+    public function cancelRecharge(string $shopId, string $rechargeId): array
+    {
+        $recharge = Recharge::where('id', $rechargeId)
+            ->where('shop_id', $shopId)
+            ->first();
+
+        if (!$recharge) {
+            return [
+                'success' => false,
+                'message' => 'Recharge not found',
+            ];
+        }
+
+        if ($recharge->isTerminal()) {
+            return [
+                'success' => false,
+                'recharge' => $recharge,
+                'message' => "Recharge already {$recharge->status}",
+            ];
+        }
+
+        if ($recharge->isProcessing()) {
+            return [
+                'success' => false,
+                'recharge' => $recharge,
+                'message' => 'Recharge is already being sent and cannot be cancelled',
+            ];
+        }
+
+        try {
+            $gatewayResponse = $this->gateway->cancelRecharge($recharge->reference_code);
+            $gatewayStatus = $gatewayResponse['status'] ?? 'unknown';
+
+            if (in_array($gatewayStatus, ['cancelled', 'already_cancelled'], true)) {
+                $this->handleRechargeCancelled($recharge, [
+                    'success' => true,
+                    'message' => $gatewayResponse['message'] ?? 'Cancelled before sending to modem',
+                    'gateway' => $gatewayResponse,
+                    'source'  => 'client_cancel',
+                ]);
+
+                return [
+                    'success' => true,
+                    'recharge' => $recharge->refresh(),
+                    'message' => 'Recharge cancelled successfully',
+                ];
+            }
+
+            if ($gatewayStatus === 'cannot_cancel') {
+                return [
+                    'success' => false,
+                    'recharge' => $recharge->refresh(),
+                    'message' => 'Recharge is already processing and cannot be cancelled',
+                ];
+            }
+
+            return [
+                'success' => false,
+                'recharge' => $recharge->refresh(),
+                'message' => 'Unable to cancel recharge at this stage',
+            ];
+        } catch (\Exception $e) {
+            Log::warning('RechargeService: cancel failed', [
+                'recharge_id' => $recharge->id,
+                'reference_code' => $recharge->reference_code,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [
+                'success' => false,
+                'recharge' => $recharge->refresh(),
+                'message' => 'Cancellation failed: ' . $e->getMessage(),
+            ];
+        }
+    }
+
     public function handleRechargeSuccess(Recharge $recharge, array $response): void
     {
         $recharge->refresh();
@@ -257,6 +333,39 @@ class RechargeService
             );
 
             AuditLog::log($recharge->shop_id, 'recharge.rejected', [
+                'recharge_id' => $recharge->id,
+                'reference_code' => $recharge->reference_code,
+                'refunded_amount' => $recharge->amount,
+            ]);
+        });
+
+        $this->broadcastRechargeUpdate($recharge);
+    }
+
+    public function handleRechargeCancelled(Recharge $recharge, array $response): void
+    {
+        $recharge->refresh();
+        if ($recharge->isTerminal()) {
+            return;
+        }
+
+        DB::transaction(function () use ($recharge, $response) {
+            $recharge->markAsCancelled();
+
+            RechargeTransaction::create([
+                'recharge_id' => $recharge->id,
+                'raw_response' => $response,
+                'processed_at' => now(),
+            ]);
+
+            $this->walletService->refund(
+                shopId: $recharge->shop_id,
+                amount: $recharge->amount,
+                description: "Remboursement recharge annulée {$recharge->phone}",
+                reference: $recharge->reference_code,
+            );
+
+            AuditLog::log($recharge->shop_id, 'recharge.cancelled', [
                 'recharge_id' => $recharge->id,
                 'reference_code' => $recharge->reference_code,
                 'refunded_amount' => $recharge->amount,

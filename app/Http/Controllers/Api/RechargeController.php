@@ -135,6 +135,23 @@ class RechargeController extends Controller
         return $this->success($recharge);
     }
 
+    public function cancel(string $id): JsonResponse
+    {
+        $result = $this->rechargeService->cancelRecharge(
+            $this->shopId(),
+            $id
+        );
+
+        if (!$result['success']) {
+            $statusCode = str_contains(strtolower($result['message']), 'not found') ? 404 : 400;
+            return $this->error($result['message'], $statusCode);
+        }
+
+        return $this->success([
+            'recharge' => $result['recharge'] ?? null,
+        ], $result['message']);
+    }
+
     /**
      * Check if the recharge gateway (Pi) is online and healthy.
      */

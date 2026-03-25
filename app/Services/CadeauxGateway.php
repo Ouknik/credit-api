@@ -184,4 +184,55 @@ class CadeauxGateway
             return ['status' => 'unreachable'];
         }
     }
+
+    /**
+     * Request cancellation for a queued recharge before it is sent to modem.
+     *
+     * @return array{status:string,order_id?:string,current_status?:string}
+     * @throws RuntimeException
+     */
+    public function cancelRecharge(string $orderId): array
+    {
+        try {
+            $response = Http::timeout($this->timeout)
+                ->withHeaders([
+                    'token' => $this->token,
+                    'Content-Type' => 'application/json',
+                    'ngrok-skip-browser-warning' => 'true',
+                ])
+                ->post("{$this->baseUrl}/cancel", [
+                    'order_id' => $orderId,
+                ]);
+
+            if (!$response->successful()) {
+                Log::warning('CadeauxGateway: cancel request failed', [
+                    'order_id' => $orderId,
+                    'status'   => $response->status(),
+                    'body'     => $response->body(),
+                ]);
+                throw new RuntimeException("Gateway cancel returned HTTP {$response->status()}");
+            }
+
+            $data = $response->json() ?? [];
+            if (!isset($data['status'])) {
+                $data['status'] = 'unknown';
+            }
+
+            Log::info('CadeauxGateway: cancel response', [
+                'order_id' => $orderId,
+                'status' => $data['status'],
+                'current_status' => $data['current_status'] ?? null,
+            ]);
+
+            return $data;
+        } catch (RuntimeException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('CadeauxGateway: cancel connection error', [
+                'order_id' => $orderId,
+                'error' => $e->getMessage(),
+            ]);
+            throw new RuntimeException("Gateway cancel connection failed: {$e->getMessage()}");
+        }
+    }
 }

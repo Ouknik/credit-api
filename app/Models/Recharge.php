@@ -124,8 +124,18 @@ class Recharge extends Model
         return $this->status === 'rejected';
     }
 
+    public function isCancelled(): bool
+    {
+        return $this->status === 'cancelled';
+    }
+
+    public function markAsCancelled(): void
+    {
+        $this->update(['status' => 'cancelled']);
+    }
+
     public function isTerminal(): bool
     {
-        return in_array($this->status, ['success', 'failed', 'balance_error', 'rejected']);
+        return in_array($this->status, ['success', 'failed', 'balance_error', 'rejected', 'cancelled']);
     }
 }

@@ -62,6 +62,7 @@ Route::middleware(['jwt.auth'])->group(function () {
     // Recharges
     Route::get('recharges', [RechargeController::class, 'index']);
     Route::post('recharges', [RechargeController::class, 'store'])->middleware('recharge.limit');
+    Route::post('recharges/{id}/cancel', [RechargeController::class, 'cancel']);
     Route::get('recharges/operators', [RechargeController::class, 'operators']);
     Route::get('recharges/gateway-health', [RechargeController::class, 'gatewayHealth']);
     Route::get('recharges/{id}', [RechargeController::class, 'show']);

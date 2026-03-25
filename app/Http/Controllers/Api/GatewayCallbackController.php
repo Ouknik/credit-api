@@ -95,6 +95,14 @@ class GatewayCallbackController extends Controller
                 ]);
                 break;
 
+            case 'cancelled':
+                $this->rechargeService->handleRechargeCancelled($recharge, [
+                    'success' => true,
+                    'message' => $message,
+                    'source'  => 'gateway_callback',
+                ]);
+                break;
+
             case 'no_signal':
                 // Terminal: Pi tried but had no signal — refund
                 $this->rechargeService->handleRechargeFailure($recharge, [

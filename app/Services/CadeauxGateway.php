@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use InvalidArgumentException;
 use RuntimeException;
 
 /**
@@ -17,12 +18,14 @@ class CadeauxGateway
 {
     private string $baseUrl;
     private string $token;
+    private string $adminToken;
     private int $timeout;
 
     public function __construct()
     {
         $this->baseUrl = rtrim(config('services.cadeaux.base_url', ''), '/');
         $this->token   = config('services.cadeaux.token', '');
+        $this->adminToken = config('services.cadeaux.admin_token', '');
         $this->timeout = (int) config('services.cadeaux.timeout', 30);
     }
 
@@ -234,5 +237,80 @@ class CadeauxGateway
             ]);
             throw new RuntimeException("Gateway cancel connection failed: {$e->getMessage()}");
         }
+    }
+
+    /**
+     * Send admin-only Orange SIM top-up command to gateway.
+     *
+     * @return array{status:string,message?:string,modem_response?:string}
+     * @throws RuntimeException
+     */
+    public function adminOrangeTopup(string $code): array
+    {
+        $code = trim($code);
+        if ($code === '' || !preg_match('/^\d{5,32}$/', $code)) {
+            throw new InvalidArgumentException('Invalid top-up code format.');
+        }
+
+        if ($this->adminToken === '') {
+            throw new RuntimeException('Gateway admin token is not configured in backend.');
+        }
+
+        $maskedCode = $this->maskSecret($code);
+
+        try {
+            $response = Http::timeout($this->timeout)
+                ->withHeaders([
+                    'token'        => $this->token,
+                    'admin-token'  => $this->adminToken,
+                    'Content-Type' => 'application/json',
+                    'ngrok-skip-browser-warning' => 'true',
+                ])
+                ->post("{$this->baseUrl}/admin/orange/topup", [
+                    'code' => $code,
+                ]);
+
+            if (!$response->successful()) {
+                $responseData = $response->json() ?? [];
+                $message = is_array($responseData)
+                    ? ($responseData['message'] ?? $responseData['status'] ?? 'Gateway request failed')
+                    : 'Gateway request failed';
+
+                Log::warning('CadeauxGateway: admin orange topup failed', [
+                    'status' => $response->status(),
+                    'message' => $message,
+                    'code' => $maskedCode,
+                ]);
+
+                throw new RuntimeException("Gateway admin top-up failed: {$message}");
+            }
+
+            $data = $response->json() ?? [];
+
+            Log::info('CadeauxGateway: admin orange topup sent', [
+                'status' => $data['status'] ?? 'unknown',
+                'code' => $maskedCode,
+            ]);
+
+            return $data;
+        } catch (RuntimeException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('CadeauxGateway: admin orange topup connection error', [
+                'error' => $e->getMessage(),
+                'code' => $maskedCode,
+            ]);
+            throw new RuntimeException("Gateway admin top-up connection failed: {$e->getMessage()}");
+        }
+    }
+
+    private function maskSecret(string $value): string
+    {
+        $length = strlen($value);
+        if ($length <= 4) {
+            return str_repeat('*', $length);
+        }
+
+        return substr($value, 0, 2) . str_repeat('*', max($length - 4, 1)) . substr($value, -2);
     }
 }

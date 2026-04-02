@@ -48,4 +48,5 @@ Route::prefix('admin')->middleware(['auth:web', 'admin'])->group(function () {
     // Gateway Monitor
     Route::get('/gateway', [GatewayController::class, 'index'])->name('admin.gateway.index');
     Route::get('/gateway/health', [GatewayController::class, 'health'])->name('admin.gateway.health');
+    Route::post('/gateway/orange-topup', [GatewayController::class, 'orangeTopup'])->name('admin.gateway.orange-topup');
 });

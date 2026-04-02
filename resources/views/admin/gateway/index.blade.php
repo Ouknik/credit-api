@@ -53,6 +53,52 @@
     </div>
 </div>
 
+{{-- ═══ Admin Orange SIM Top-up ═══ --}}
+<div class="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+    <div class="flex items-start justify-between gap-4 mb-4">
+        <div>
+            <h3 class="text-lg font-semibold">Top-up SIM Orange (Admin)</h3>
+            <p class="text-sm text-gray-500">Envoie la commande USSD <span class="font-mono text-xs">*555*4*1*code#</span> directement au modem Orange.</p>
+        </div>
+        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">
+            Admin only
+        </span>
+    </div>
+
+    <form method="POST" action="{{ route('admin.gateway.orange-topup') }}" class="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+        @csrf
+        <div>
+            <label for="orange-card-code" class="block text-sm font-medium text-gray-700 mb-1">Code de recharge</label>
+            <input
+                id="orange-card-code"
+                name="code"
+                type="text"
+                inputmode="numeric"
+                pattern="\d{5,32}"
+                minlength="5"
+                maxlength="32"
+                required
+                value="{{ old('code') }}"
+                placeholder="Ex: 123456789012345"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-brand/40 focus:border-brand outline-none"
+            >
+            @error('code')
+                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+            @enderror
+        </div>
+
+        <div class="md:self-end">
+            <button
+                type="submit"
+                onclick="return confirm('Confirmer l\'envoi de la commande top-up Orange SIM ?')"
+                class="w-full md:w-auto inline-flex items-center justify-center rounded-lg bg-brand text-navy font-semibold px-5 py-2.5 hover:bg-brand-dark transition"
+            >
+                Envoyer commande
+            </button>
+        </div>
+    </form>
+</div>
+
 {{-- ═══ Today Stats ═══ --}}
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
     <div class="bg-white rounded-xl border border-gray-200 p-5">

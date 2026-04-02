@@ -43,6 +43,7 @@ return [
     'cadeaux' => [
         'base_url' => env('CADEAUX_BASE_URL', 'https://xxxx.ngrok-free.app'),
         'token'    => env('CADEAUX_TOKEN', '123456SECRET'),
+        'admin_token' => env('CADEAUX_ADMIN_TOKEN', ''),
         'timeout'  => env('CADEAUX_TIMEOUT', 30),
     ],
 

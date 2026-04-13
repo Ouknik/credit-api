@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\OtpVerification;
 use App\Services\AuthService;
 use App\Services\WhatsAppOtpService;
 use App\Http\Requests\LoginRequest;
@@ -11,6 +12,7 @@ use App\Http\Requests\SendOtpRequest;
 use App\Http\Requests\VerifyOtpRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Tymon\JWTAuth\Exceptions\JWTException;
 use Tymon\JWTAuth\Exceptions\TokenExpiredException;
 use Tymon\JWTAuth\Exceptions\TokenInvalidException;
@@ -28,6 +30,12 @@ class AuthController extends Controller
     public function sendOtp(SendOtpRequest $request): JsonResponse
     {
         try {
+            if ($this->isStaticOtpPhone($request->phone)) {
+                $staticOtp = $this->staticOtpCode();
+                Log::warning('AuthController: static OTP used for test phone', ['phone' => $request->phone]);
+                return $this->success(['otp' => $staticOtp], 'OTP sent successfully via test profile');
+            }
+
             Log::info('AuthController: sendOtp called', ['phone' => $request->phone]);
             $otp = $this->otpService->sendOtp($request->phone);
             return $this->success(['otp' => $otp], 'OTP sent successfully via WhatsApp');
@@ -43,6 +51,30 @@ class AuthController extends Controller
     public function verifyOtp(VerifyOtpRequest $request): JsonResponse
     {
         try {
+            if ($this->isStaticOtpPhone($request->phone)) {
+                $expectedOtp = $this->staticOtpCode();
+                if (trim($request->otp) !== $expectedOtp) {
+                    return $this->error('Invalid or expired OTP code.', 400);
+                }
+
+                $token = Str::random(64);
+                OtpVerification::where('phone', $request->phone)->delete();
+
+                OtpVerification::create([
+                    'phone' => $request->phone,
+                    'verified' => true,
+                    'verification_token' => $token,
+                    'expires_at' => now()->addMinutes(10),
+                ]);
+
+                Log::warning('AuthController: static OTP verification accepted', ['phone' => $request->phone]);
+
+                return $this->success(
+                    ['verification_token' => $token],
+                    'OTP verified successfully'
+                );
+            }
+
             $token = $this->otpService->verifyOtp($request->phone, $request->otp);
             return $this->success(
                 ['verification_token' => $token],
@@ -107,5 +139,34 @@ class AuthController extends Controller
     {
         $shop = $this->authService->me();
         return $this->success($shop);
+    }
+
+    private function isStaticOtpPhone(string $phone): bool
+    {
+        if (!$this->isStaticOtpEnabled()) {
+            return false;
+        }
+
+        $configuredPhone = $this->normalizePhone((string) config('services.whatsotp.test_phone', ''));
+        if ($configuredPhone === '') {
+            return false;
+        }
+
+        return $this->normalizePhone($phone) === $configuredPhone;
+    }
+
+    private function staticOtpCode(): string
+    {
+        return trim((string) config('services.whatsotp.test_otp', ''));
+    }
+
+    private function isStaticOtpEnabled(): bool
+    {
+        return filter_var(config('services.whatsotp.test_enabled', false), FILTER_VALIDATE_BOOL);
+    }
+
+    private function normalizePhone(string $phone): string
+    {
+        return preg_replace('/\D+/', '', $phone) ?? '';
     }
 }

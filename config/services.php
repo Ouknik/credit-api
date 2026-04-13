@@ -57,6 +57,9 @@ return [
         'api_key'    => env('WHATSOTP_API_KEY', ''),
         'api_secret' => env('WHATSOTP_API_SECRET', ''),
         'timeout'    => env('WHATSOTP_TIMEOUT', 15),
+        'test_enabled' => env('WHATSOTP_TEST_ENABLED', false),
+        'test_phone'   => env('WHATSOTP_TEST_PHONE', ''),
+        'test_otp'     => env('WHATSOTP_TEST_OTP', ''),
     ],
 
 ];

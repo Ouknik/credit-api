@@ -26,6 +26,9 @@ class Shop extends Authenticatable implements JWTSubject
 {
     use HasFactory, HasUuids;
 
+    public const ROLE_SHOP_OWNER = 'shop_owner';
+    public const ROLE_DISTRIBUTOR = 'distributor';
+
     protected $fillable = [
         'name',
         'phone',
@@ -33,6 +36,7 @@ class Shop extends Authenticatable implements JWTSubject
         'password',
         'balance',
         'status',
+        'role',
     ];
 
     protected $hidden = [
@@ -72,6 +76,16 @@ class Shop extends Authenticatable implements JWTSubject
         return $this->hasMany(Recharge::class);
     }
 
+    public function procurementOrders(): HasMany
+    {
+        return $this->hasMany(ProcurementOrder::class);
+    }
+
+    public function procurementOffers(): HasMany
+    {
+        return $this->hasMany(ProcurementOffer::class, 'distributor_shop_id');
+    }
+
     public function auditLogs(): HasMany
     {
         return $this->hasMany(AuditLog::class);
@@ -80,6 +94,21 @@ class Shop extends Authenticatable implements JWTSubject
     public function isActive(): bool
     {
         return $this->status === 'active';
+    }
+
+    public function hasRole(string $role): bool
+    {
+        return $this->role === $role;
+    }
+
+    public function isShopOwner(): bool
+    {
+        return $this->hasRole(self::ROLE_SHOP_OWNER);
+    }
+
+    public function isDistributor(): bool
+    {
+        return $this->hasRole(self::ROLE_DISTRIBUTOR);
     }
 
     public function hasEnoughBalance(float $amount): bool

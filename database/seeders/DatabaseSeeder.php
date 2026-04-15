@@ -18,6 +18,11 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call([
+            CategorySeeder::class,
+            ProductSeeder::class,
+        ]);
+
         // Create demo shop
         $shop = Shop::firstOrCreate(
             ['email' => 'demo@shop.com'],
@@ -26,10 +31,23 @@ class DatabaseSeeder extends Seeder
                 'password' => bcrypt('password123'),
                 'balance' => 1000.00,
                 'status' => 'active',
+                'role' => Shop::ROLE_SHOP_OWNER,
+            ]
+        );
+
+        $distributor = Shop::firstOrCreate(
+            ['email' => 'demo-distributor@shop.com'],
+            [
+                'name' => 'Demo Distributor',
+                'password' => bcrypt('password123'),
+                'balance' => 5000.00,
+                'status' => 'active',
+                'role' => Shop::ROLE_DISTRIBUTOR,
             ]
         );
 
         $this->command->info("Demo shop created: demo@shop.com / password123");
+        $this->command->info("Demo distributor created: demo-distributor@shop.com / password123");
 
         // Create customers for the demo shop
         $customers = Customer::factory(10)->create([
@@ -78,7 +96,8 @@ class DatabaseSeeder extends Seeder
         $this->command->info("Created recharges");
 
         // Create additional shops for testing
-        Shop::factory(2)->create();
+        Shop::factory(2)->shopOwner()->create();
+        Shop::factory()->distributor()->create();
         
         $this->command->info("Created 2 additional test shops");
         $this->command->info("Seeding completed successfully!");

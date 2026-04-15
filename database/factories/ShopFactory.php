@@ -20,6 +20,7 @@ class ShopFactory extends Factory
             'password' => 'password', // Will be hashed automatically
             'balance' => fake()->randomFloat(2, 100, 5000),
             'status' => 'active',
+            'role' => Shop::ROLE_SHOP_OWNER,
         ];
     }
 
@@ -34,6 +35,20 @@ class ShopFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'balance' => $amount,
+        ]);
+    }
+
+    public function distributor(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => Shop::ROLE_DISTRIBUTOR,
+        ]);
+    }
+
+    public function shopOwner(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role' => Shop::ROLE_SHOP_OWNER,
         ]);
     }
 }

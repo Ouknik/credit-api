@@ -2,26 +2,52 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
+        $driver = DB::connection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            DB::table('shops')->update([
+                'phone' => DB::raw("substr(trim(coalesce(phone, '0000000000')), 1, 20)"),
+            ]);
+            DB::table('shops')->where('phone', '')->update(['phone' => '0000000000']);
+
+            Schema::table('shops', function (Blueprint $table) {
+                $table->string('email')->nullable()->change();
+                $table->string('phone', 20)->nullable(false)->change();
+            });
+
+            Schema::table('shops', function (Blueprint $table) {
+                $table->dropUnique('shops_email_unique');
+            });
+
+            Schema::table('shops', function (Blueprint $table) {
+                $table->unique('phone');
+                $table->index('phone');
+            });
+
+            return;
+        }
+
         // First truncate long phone values while column is still varchar(255)
-        \DB::table('shops')->update([
-            'phone' => \DB::raw("LEFT(TRIM(COALESCE(phone, '0000000000')), 20)"),
+        DB::table('shops')->update([
+            'phone' => DB::raw("LEFT(TRIM(COALESCE(phone, '0000000000')), 20)"),
         ]);
-        \DB::table('shops')->where('phone', '')->update(['phone' => '0000000000']);
+        DB::table('shops')->where('phone', '')->update(['phone' => '0000000000']);
 
         // Alter column in two steps to avoid strict-mode truncation errors
-        \DB::statement("ALTER TABLE `shops` MODIFY `phone` VARCHAR(20) NULL");
-        \DB::statement("ALTER TABLE `shops` MODIFY `phone` VARCHAR(20) NOT NULL");
+        DB::statement("ALTER TABLE `shops` MODIFY `phone` VARCHAR(20) NULL");
+        DB::statement("ALTER TABLE `shops` MODIFY `phone` VARCHAR(20) NOT NULL");
 
         // Drop email unique index if it exists (name may vary)
-        $emailIndexes = \DB::select("SHOW INDEX FROM `shops` WHERE Column_name = 'email' AND Non_unique = 0");
+        $emailIndexes = DB::select("SHOW INDEX FROM `shops` WHERE Column_name = 'email' AND Non_unique = 0");
         foreach ($emailIndexes as $idx) {
-            \DB::statement("ALTER TABLE `shops` DROP INDEX `{$idx->Key_name}`");
+            DB::statement("ALTER TABLE `shops` DROP INDEX `{$idx->Key_name}`");
         }
 
         Schema::table('shops', function (Blueprint $table) {
@@ -33,6 +59,23 @@ return new class extends Migration
 
     public function down(): void
     {
+        $driver = DB::connection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            Schema::table('shops', function (Blueprint $table) {
+                $table->dropUnique(['phone']);
+                $table->dropIndex(['phone']);
+            });
+
+            Schema::table('shops', function (Blueprint $table) {
+                $table->string('phone')->nullable()->change();
+                $table->string('email')->nullable(false)->change();
+                $table->unique('email');
+            });
+
+            return;
+        }
+
         Schema::table('shops', function (Blueprint $table) {
             $table->dropUnique(['phone']);
             $table->dropIndex(['shops_phone_index']);

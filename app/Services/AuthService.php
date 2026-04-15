@@ -23,6 +23,7 @@ class AuthService
             'password' => bcrypt(Str::random(32)), // placeholder, not used for auth
             'balance'  => 0,
             'status'   => 'active',
+            'role'     => Shop::ROLE_SHOP_OWNER,
         ]);
 
         $token = JWTAuth::fromUser($shop);

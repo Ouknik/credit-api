@@ -8,6 +8,10 @@ use App\Http\Controllers\Api\GatewayCallbackController;
 use App\Http\Controllers\Api\RechargeController;
 use App\Http\Controllers\Api\ReportController;
 use App\Http\Controllers\Api\WalletApiController;
+use App\Http\Controllers\Api\V1\CatalogController;
+use App\Http\Controllers\Api\V1\Distributor\OfferController as V1DistributorOfferController;
+use App\Http\Controllers\Api\V1\Distributor\OrderController as V1DistributorOrderController;
+use App\Http\Controllers\Api\V1\Shop\OrderController as V1ShopOrderController;
 
 /*
 |--------------------------------------------------------------------------
@@ -20,6 +24,39 @@ use App\Http\Controllers\Api\WalletApiController;
 
 // Gateway callback (Pi pushes recharge results — authenticated by gateway token)
 Route::post('gateway/callback', GatewayCallbackController::class);
+
+// ──────────────────────────────────────────────────────────────────────────
+// Mol7anout v1 API
+// ──────────────────────────────────────────────────────────────────────────
+
+Route::prefix('v1')->group(function () {
+    // Public catalog endpoints
+    Route::get('products', [CatalogController::class, 'products']);
+    Route::get('products/{id}', [CatalogController::class, 'product']);
+    Route::get('categories', [CatalogController::class, 'categories']);
+
+    // Authenticated workflows
+    Route::middleware(['jwt.auth'])->group(function () {
+        Route::middleware('shop.role:shop_owner')->group(function () {
+            // Shop owner: orders
+            Route::get('shop/orders', [V1ShopOrderController::class, 'index']);
+            Route::post('shop/orders', [V1ShopOrderController::class, 'store']);
+            Route::get('shop/orders/{id}', [V1ShopOrderController::class, 'show']);
+            Route::post('shop/orders/{id}/publish', [V1ShopOrderController::class, 'publish']);
+            Route::get('shop/orders/{id}/offers', [V1ShopOrderController::class, 'offers']);
+            Route::post('shop/orders/{id}/offers/{offerId}/accept', [V1ShopOrderController::class, 'accept']);
+            Route::post('shop/orders/{id}/confirm-delivery', [V1ShopOrderController::class, 'confirmDelivery']);
+        });
+
+        Route::middleware('shop.role:distributor')->group(function () {
+            // Distributor: discover orders and submit offers
+            Route::get('distributor/orders/available', [V1DistributorOrderController::class, 'available']);
+            Route::get('distributor/orders/{id}', [V1DistributorOrderController::class, 'show']);
+            Route::post('distributor/offers', [V1DistributorOfferController::class, 'store']);
+            Route::put('distributor/orders/{id}/status', [V1DistributorOrderController::class, 'updateStatus']);
+        });
+    });
+});
 
 // Public routes
 Route::prefix('auth')->group(function () {

@@ -8,6 +8,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
+        channels: __DIR__.'/../routes/channels.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
@@ -16,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'jwt.auth' => \App\Http\Middleware\JwtMiddleware::class,
             'recharge.limit' => \App\Http\Middleware\RechargeRateLimiter::class,
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
+            'shop.role' => \App\Http\Middleware\EnsureShopRole::class,
         ]);
 
         $middleware->redirectGuestsTo('/admin/login');

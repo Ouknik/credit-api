@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Product;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class ProductAdminController extends Controller
@@ -56,6 +57,39 @@ class ProductAdminController extends Controller
         Product::query()->create($validated);
 
         return redirect()->route('admin.products.index')->with('success', 'Produit ajouté avec succès.');
+    }
+
+    public function storeCategory(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255', 'unique:categories,name'],
+            'slug' => ['nullable', 'string', 'max:255', 'unique:categories,slug'],
+            'description' => ['nullable', 'string'],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
+
+        $baseSlug = trim((string) ($validated['slug'] ?? ''));
+        if ($baseSlug === '') {
+            $baseSlug = Str::slug((string) $validated['name']);
+        } else {
+            $baseSlug = Str::slug($baseSlug);
+        }
+
+        $slug = $baseSlug !== '' ? $baseSlug : 'category';
+        $counter = 2;
+        while (Category::query()->where('slug', $slug)->exists()) {
+            $slug = ($baseSlug !== '' ? $baseSlug : 'category') . '-' . $counter;
+            $counter++;
+        }
+
+        Category::query()->create([
+            'name' => $validated['name'],
+            'slug' => $slug,
+            'description' => $validated['description'] ?? null,
+            'is_active' => $request->boolean('is_active', true),
+        ]);
+
+        return redirect()->route('admin.products.index')->with('success', 'Catégorie ajoutée avec succès.');
     }
 
     public function edit(Product $product): View

@@ -55,6 +55,7 @@ Route::prefix('admin')->middleware(['auth:web', 'admin'])->group(function () {
     // Product management
     Route::get('/products', [ProductAdminController::class, 'index'])->name('admin.products.index');
     Route::post('/products', [ProductAdminController::class, 'store'])->name('admin.products.store');
+    Route::post('/products/categories', [ProductAdminController::class, 'storeCategory'])->name('admin.products.categories.store');
     Route::get('/products/{product}/edit', [ProductAdminController::class, 'edit'])->name('admin.products.edit');
     Route::put('/products/{product}', [ProductAdminController::class, 'update'])->name('admin.products.update');
     Route::delete('/products/{product}', [ProductAdminController::class, 'destroy'])->name('admin.products.destroy');

@@ -3,7 +3,7 @@
 @section('page-title', 'Gestion Produits')
 
 @section('content')
-<div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
+<div class="grid grid-cols-1 xl:grid-cols-4 gap-6 mb-6">
     <div class="xl:col-span-2 bg-white rounded-xl border border-gray-200 p-4">
         <form method="GET" class="flex flex-col md:flex-row gap-3">
             <input type="text" name="search" value="{{ request('search') }}" placeholder="Rechercher (nom, slug, sku)..."
@@ -47,6 +47,21 @@
                 Actif
             </label>
             <button type="submit" class="w-full px-4 py-2.5 rounded-lg bg-brand text-navy font-semibold hover:bg-brand-dark transition">Ajouter</button>
+        </form>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 p-4">
+        <h3 class="text-sm font-semibold text-gray-900 mb-3">Nouvelle catégorie</h3>
+        <form method="POST" action="{{ route('admin.products.categories.store') }}" class="space-y-3">
+            @csrf
+            <input name="name" required placeholder="Nom catégorie" class="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm"/>
+            <input name="slug" placeholder="Slug (optionnel)" class="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm"/>
+            <textarea name="description" rows="2" placeholder="Description (optionnel)" class="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm"></textarea>
+            <label class="inline-flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" name="is_active" value="1" checked class="rounded border-gray-300 text-brand focus:ring-brand">
+                Active
+            </label>
+            <button type="submit" class="w-full px-4 py-2.5 rounded-lg bg-navy text-white font-semibold hover:bg-navy/90 transition">Ajouter catégorie</button>
         </form>
     </div>
 </div>

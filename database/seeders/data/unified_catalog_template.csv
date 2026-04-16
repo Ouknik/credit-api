@@ -1,0 +1,5 @@
+row_type,category_slug,name,slug,sku,description,default_unit,image_url,is_active
+category,,Boissons,boissons,,Produits liquides,,,1
+category,,Snacks,snacks,,Chips biscuits et confiserie,,,1
+product,boissons,Eau Minerale,eau-minerale,SKU-EAU-001,Eau en bouteille 1.5L,pack,https://example.com/eau.jpg,1
+product,snacks,Chips Nature,chips-nature,SKU-CHIPS-001,Sachet chips 45g,sachet,https://example.com/chips.jpg,1

@@ -8,6 +8,7 @@ use App\Models\Product;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 use SplFileObject;
 use Throwable;
 
@@ -15,6 +16,26 @@ class ProductImportController extends Controller
 {
     /** @var array<int, string> */
     private array $requiredHeaders = [
+        'category_slug',
+        'name',
+        'slug',
+        'description',
+        'default_unit',
+        'image_url',
+        'is_active',
+    ];
+
+    /** @var array<int, string> */
+    private array $requiredCategoryHeaders = [
+        'name',
+        'slug',
+        'description',
+        'is_active',
+    ];
+
+    /** @var array<int, string> */
+    private array $requiredUnifiedHeaders = [
+        'row_type',
         'category_slug',
         'name',
         'slug',
@@ -45,6 +66,36 @@ class ProductImportController extends Controller
         return response()->download(
             $templatePath,
             'products_no_price_template.csv',
+            ['Content-Type' => 'text/csv; charset=UTF-8']
+        );
+    }
+
+    public function downloadCategoryTemplate()
+    {
+        $templatePath = base_path('database/seeders/data/categories_template.csv');
+
+        if (!is_file($templatePath)) {
+            return back()->with('error', 'Fichier modèle catégories introuvable.');
+        }
+
+        return response()->download(
+            $templatePath,
+            'categories_template.csv',
+            ['Content-Type' => 'text/csv; charset=UTF-8']
+        );
+    }
+
+    public function downloadUnifiedTemplate()
+    {
+        $templatePath = base_path('database/seeders/data/unified_catalog_template.csv');
+
+        if (!is_file($templatePath)) {
+            return back()->with('error', 'Fichier modèle unifié introuvable.');
+        }
+
+        return response()->download(
+            $templatePath,
+            'unified_catalog_template.csv',
             ['Content-Type' => 'text/csv; charset=UTF-8']
         );
     }
@@ -130,6 +181,216 @@ class ProductImportController extends Controller
             ->with('import_report', $report);
     }
 
+    public function importCategories(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'categories_csv_file' => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
+        ]);
+
+        $filePath = $request->file('categories_csv_file')?->getRealPath();
+        if (!$filePath) {
+            return back()->with('error', 'Impossible de lire le fichier catégories envoyé.');
+        }
+
+        $report = [
+            'processed' => 0,
+            'created' => 0,
+            'updated' => 0,
+            'skipped' => 0,
+            'errors' => [],
+        ];
+
+        $csv = new SplFileObject($filePath);
+        $csv->setFlags(SplFileObject::READ_CSV | SplFileObject::SKIP_EMPTY | SplFileObject::DROP_NEW_LINE);
+
+        $line = 0;
+        $header = null;
+
+        foreach ($csv as $row) {
+            $line++;
+
+            if ($row === false || $row === [null]) {
+                continue;
+            }
+
+            $row = array_map(
+                static fn ($value) => is_string($value) ? trim($value) : $value,
+                $row
+            );
+
+            if ($header === null) {
+                $header = $this->normalizeHeader($row);
+
+                $missing = array_diff($this->requiredCategoryHeaders, $header);
+                if (!empty($missing)) {
+                    return back()->with('error', 'Colonnes catégories manquantes: ' . implode(', ', $missing));
+                }
+
+                continue;
+            }
+
+            if ($this->isRowEmpty($row)) {
+                continue;
+            }
+
+            $report['processed']++;
+
+            $entry = $this->buildEntry($header, $row);
+
+            try {
+                $result = $this->upsertCategoryFromEntry($entry);
+                $report[$result]++;
+            } catch (Throwable $e) {
+                $report['skipped']++;
+                if (count($report['errors']) < 25) {
+                    $report['errors'][] = "Ligne {$line}: {$e->getMessage()}";
+                }
+            }
+        }
+
+        $summary = sprintf(
+            'Import catégories terminé: %d créé(s), %d mis à jour, %d ignoré(s).',
+            $report['created'],
+            $report['updated'],
+            $report['skipped']
+        );
+
+        return redirect()
+            ->route('admin.products.import.form')
+            ->with('success', $summary)
+            ->with('category_import_report', $report);
+    }
+
+    public function importUnified(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'unified_csv_file' => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
+        ]);
+
+        $filePath = $request->file('unified_csv_file')?->getRealPath();
+        if (!$filePath) {
+            return back()->with('error', 'Impossible de lire le fichier unifié envoyé.');
+        }
+
+        $report = [
+            'total_rows' => 0,
+            'unknown_rows' => 0,
+            'categories' => [
+                'processed' => 0,
+                'created' => 0,
+                'updated' => 0,
+                'skipped' => 0,
+            ],
+            'products' => [
+                'processed' => 0,
+                'created' => 0,
+                'updated' => 0,
+                'skipped' => 0,
+            ],
+            'errors' => [],
+        ];
+
+        $csv = new SplFileObject($filePath);
+        $csv->setFlags(SplFileObject::READ_CSV | SplFileObject::SKIP_EMPTY | SplFileObject::DROP_NEW_LINE);
+
+        $line = 0;
+        $header = null;
+        $categoryEntries = [];
+        $productEntries = [];
+
+        foreach ($csv as $row) {
+            $line++;
+
+            if ($row === false || $row === [null]) {
+                continue;
+            }
+
+            $row = array_map(
+                static fn ($value) => is_string($value) ? trim($value) : $value,
+                $row
+            );
+
+            if ($header === null) {
+                $header = $this->normalizeHeader($row);
+
+                $missing = array_diff($this->requiredUnifiedHeaders, $header);
+                if (!empty($missing)) {
+                    return back()->with('error', 'Colonnes unifiées manquantes: ' . implode(', ', $missing));
+                }
+
+                continue;
+            }
+
+            if ($this->isRowEmpty($row)) {
+                continue;
+            }
+
+            $report['total_rows']++;
+
+            $entry = $this->buildEntry($header, $row);
+            $rowType = strtolower(trim((string) ($entry['row_type'] ?? '')));
+
+            if (in_array($rowType, ['category', 'cat'], true)) {
+                $categoryEntries[] = ['line' => $line, 'entry' => $entry];
+                continue;
+            }
+
+            if (in_array($rowType, ['product', 'prod'], true)) {
+                $productEntries[] = ['line' => $line, 'entry' => $entry];
+                continue;
+            }
+
+            $report['unknown_rows']++;
+            if (count($report['errors']) < 25) {
+                $report['errors'][] = "Ligne {$line}: row_type invalide ({$rowType}). Utiliser category ou product.";
+            }
+        }
+
+        foreach ($categoryEntries as $item) {
+            $report['categories']['processed']++;
+
+            try {
+                $result = $this->upsertCategoryFromEntry($item['entry']);
+                $report['categories'][$result]++;
+            } catch (Throwable $e) {
+                $report['categories']['skipped']++;
+                if (count($report['errors']) < 25) {
+                    $report['errors'][] = 'Ligne ' . $item['line'] . ' [category]: ' . $e->getMessage();
+                }
+            }
+        }
+
+        $categoriesBySlug = Category::query()->pluck('id', 'slug')->all();
+
+        foreach ($productEntries as $item) {
+            $report['products']['processed']++;
+
+            try {
+                $result = $this->upsertProductFromEntry($item['entry'], $categoriesBySlug);
+                $report['products'][$result]++;
+            } catch (Throwable $e) {
+                $report['products']['skipped']++;
+                if (count($report['errors']) < 25) {
+                    $report['errors'][] = 'Ligne ' . $item['line'] . ' [product]: ' . $e->getMessage();
+                }
+            }
+        }
+
+        $summary = sprintf(
+            'Import unifié terminé: catégories %d créées/%d mises à jour, produits %d créés/%d mis à jour, %d lignes ignorées.',
+            $report['categories']['created'],
+            $report['categories']['updated'],
+            $report['products']['created'],
+            $report['products']['updated'],
+            $report['categories']['skipped'] + $report['products']['skipped'] + $report['unknown_rows']
+        );
+
+        return redirect()
+            ->route('admin.products.import.form')
+            ->with('success', $summary)
+            ->with('unified_import_report', $report);
+    }
+
     /**
      * @param  array<int, mixed>  $row
      * @return array<int, string>
@@ -174,8 +435,15 @@ class ProductImportController extends Controller
         $sku = trim((string) ($entry['sku'] ?? ''));
         $defaultUnit = trim((string) ($entry['default_unit'] ?? ''));
 
-        if ($categorySlug === '' || $name === '' || $slug === '' || $sku === '' || $defaultUnit === '') {
-            throw new \RuntimeException('Champs requis vides (category_slug, name, slug, sku, default_unit).');
+        if ($categorySlug === '' || $name === '' || $defaultUnit === '') {
+            throw new \RuntimeException('Champs requis vides (category_slug, name, default_unit).');
+        }
+
+        if ($slug === '') {
+            $slug = Str::slug($name);
+            if ($slug === '') {
+                throw new \RuntimeException('Slug introuvable: fournir slug ou un name valide.');
+            }
         }
 
         $categoryId = $categoriesBySlug[$categorySlug] ?? null;
@@ -183,7 +451,8 @@ class ProductImportController extends Controller
             throw new \RuntimeException("Catégorie introuvable: {$categorySlug}");
         }
 
-        $isActive = $this->toBoolean($entry['is_active'] ?? true);
+        $isActiveValue = trim((string) ($entry['is_active'] ?? ''));
+        $isActive = $isActiveValue === '' ? true : $this->toBoolean($isActiveValue);
         if ($isActive === null) {
             throw new \RuntimeException('Valeur is_active invalide (utiliser true/false ou 1/0).');
         }
@@ -191,7 +460,7 @@ class ProductImportController extends Controller
         $payload = [
             'category_id' => $categoryId,
             'name' => $name,
-            'sku' => $sku,
+            'sku' => $sku !== '' ? $sku : null,
             'description' => trim((string) ($entry['description'] ?? '')),
             'image_url' => trim((string) ($entry['image_url'] ?? '')),
             'default_unit' => $defaultUnit,
@@ -209,6 +478,58 @@ class ProductImportController extends Controller
         }
 
         Product::query()->create(array_merge(['slug' => $slug], $payload));
+
+        return 'created';
+    }
+
+    /**
+     * @param  array<string, mixed>  $entry
+     */
+    private function upsertCategoryFromEntry(array $entry): string
+    {
+        $name = trim((string) ($entry['name'] ?? ''));
+        if ($name === '') {
+            throw new \RuntimeException('Le champ name est obligatoire.');
+        }
+
+        $incomingSlug = trim((string) ($entry['slug'] ?? ''));
+        $baseSlug = Str::slug($incomingSlug !== '' ? $incomingSlug : $name);
+        $slug = $baseSlug !== '' ? $baseSlug : 'category';
+
+        $isActiveValue = trim((string) ($entry['is_active'] ?? ''));
+        $isActive = $isActiveValue === '' ? true : $this->toBoolean($isActiveValue);
+        if ($isActive === null) {
+            throw new \RuntimeException('Valeur is_active invalide (utiliser true/false ou 1/0).');
+        }
+
+        $description = trim((string) ($entry['description'] ?? ''));
+
+        $existing = Category::query()->where('slug', $slug)->first();
+
+        if ($existing) {
+            $existing->fill([
+                'name' => $name,
+                'description' => $description,
+                'is_active' => $isActive,
+            ]);
+            $existing->save();
+
+            return 'updated';
+        }
+
+        $uniqueSlug = $slug;
+        $counter = 2;
+        while (Category::query()->where('slug', $uniqueSlug)->exists()) {
+            $uniqueSlug = $slug . '-' . $counter;
+            $counter++;
+        }
+
+        Category::query()->create([
+            'name' => $name,
+            'slug' => $uniqueSlug,
+            'description' => $description,
+            'is_active' => $isActive,
+        ]);
 
         return 'created';
     }

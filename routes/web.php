@@ -63,5 +63,9 @@ Route::prefix('admin')->middleware(['auth:web', 'admin'])->group(function () {
     // Products CSV Import (no price)
     Route::get('/products/import', [ProductImportController::class, 'showImportForm'])->name('admin.products.import.form');
     Route::post('/products/import', [ProductImportController::class, 'import'])->name('admin.products.import.submit');
+    Route::post('/products/import/categories', [ProductImportController::class, 'importCategories'])->name('admin.products.import.categories.submit');
+    Route::post('/products/import/unified', [ProductImportController::class, 'importUnified'])->name('admin.products.import.unified.submit');
     Route::get('/products/import/template', [ProductImportController::class, 'downloadTemplate'])->name('admin.products.import.template');
+    Route::get('/products/import/categories/template', [ProductImportController::class, 'downloadCategoryTemplate'])->name('admin.products.import.categories.template');
+    Route::get('/products/import/unified/template', [ProductImportController::class, 'downloadUnifiedTemplate'])->name('admin.products.import.unified.template');
 });

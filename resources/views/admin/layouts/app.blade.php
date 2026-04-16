@@ -84,6 +84,12 @@
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z"/></svg>
                 Gateway
             </a>
+            <a href="{{ route('admin.products.import.form') }}"
+               class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition
+                      {{ request()->routeIs('admin.products.import.*') ? 'bg-brand/20 text-brand' : 'text-gray-300 hover:bg-white/5 hover:text-white' }}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5A3.375 3.375 0 0010.125 2.25H6.75A2.25 2.25 0 004.5 4.5v15A2.25 2.25 0 006.75 21.75h10.5a2.25 2.25 0 002.25-2.25V14.25z"/><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 2.25V6a2.25 2.25 0 002.25 2.25h3.75M12 18v-6m0 0-2.25 2.25M12 12l2.25 2.25"/></svg>
+                Import Produits
+            </a>
         </nav>
 
         {{-- User --}}

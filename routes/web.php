@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AdminAuthController;
 use App\Http\Controllers\Admin\AdminCustomerController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\GatewayController;
+use App\Http\Controllers\Admin\ProductImportController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\ShopController;
 use App\Http\Controllers\Admin\WalletController;
@@ -49,4 +50,9 @@ Route::prefix('admin')->middleware(['auth:web', 'admin'])->group(function () {
     Route::get('/gateway', [GatewayController::class, 'index'])->name('admin.gateway.index');
     Route::get('/gateway/health', [GatewayController::class, 'health'])->name('admin.gateway.health');
     Route::post('/gateway/orange-topup', [GatewayController::class, 'orangeTopup'])->name('admin.gateway.orange-topup');
+
+    // Products CSV Import (no price)
+    Route::get('/products/import', [ProductImportController::class, 'showImportForm'])->name('admin.products.import.form');
+    Route::post('/products/import', [ProductImportController::class, 'import'])->name('admin.products.import.submit');
+    Route::get('/products/import/template', [ProductImportController::class, 'downloadTemplate'])->name('admin.products.import.template');
 });

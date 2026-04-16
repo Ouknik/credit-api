@@ -3,6 +3,27 @@
 @section('page-title', 'Dashboard')
 
 @section('content')
+<div class="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+            <h3 class="text-base font-semibold text-gray-900">Actions rapides</h3>
+            <p class="text-sm text-gray-500 mt-1">Importer des produits depuis un fichier CSV sans prix.</p>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-2">
+            <a href="{{ route('admin.products.import.form') }}"
+               class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-navy hover:bg-brand-dark transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V6m0 10.5 3.75-3.75M12 16.5l-3.75-3.75M3.75 19.5h16.5"/></svg>
+                Importer produits CSV
+            </a>
+            <a href="{{ route('admin.products.import.template') }}"
+               class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 15.75v2.25A2.25 2.25 0 006 20.25h12A2.25 2.25 0 0020.25 18v-2.25M7.5 10.5 12 15m0 0 4.5-4.5M12 15V3.75"/></svg>
+                Télécharger modèle CSV
+            </a>
+        </div>
+    </div>
+</div>
+
 {{-- ═══ KPI Cards ═══ --}}
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
     {{-- Total Shops --}}

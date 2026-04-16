@@ -11,6 +11,13 @@
         </div>
         @if(Route::has('admin.products.import.form'))
             <div class="flex flex-col sm:flex-row gap-2">
+                @if(Route::has('admin.products.index'))
+                    <a href="{{ route('admin.products.index') }}"
+                       class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 6.75h15m-15 5.25h15m-15 5.25h15"/></svg>
+                        Gestion produits
+                    </a>
+                @endif
                 <a href="{{ route('admin.products.import.form') }}"
                    class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-navy hover:bg-brand-dark transition">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V6m0 10.5 3.75-3.75M12 16.5l-3.75-3.75M3.75 19.5h16.5"/></svg>

@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AdminAuthController;
 use App\Http\Controllers\Admin\AdminCustomerController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\GatewayController;
+use App\Http\Controllers\Admin\ProductAdminController;
 use App\Http\Controllers\Admin\ProductImportController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\ShopController;
@@ -50,6 +51,13 @@ Route::prefix('admin')->middleware(['auth:web', 'admin'])->group(function () {
     Route::get('/gateway', [GatewayController::class, 'index'])->name('admin.gateway.index');
     Route::get('/gateway/health', [GatewayController::class, 'health'])->name('admin.gateway.health');
     Route::post('/gateway/orange-topup', [GatewayController::class, 'orangeTopup'])->name('admin.gateway.orange-topup');
+
+    // Product management
+    Route::get('/products', [ProductAdminController::class, 'index'])->name('admin.products.index');
+    Route::post('/products', [ProductAdminController::class, 'store'])->name('admin.products.store');
+    Route::get('/products/{product}/edit', [ProductAdminController::class, 'edit'])->name('admin.products.edit');
+    Route::put('/products/{product}', [ProductAdminController::class, 'update'])->name('admin.products.update');
+    Route::delete('/products/{product}', [ProductAdminController::class, 'destroy'])->name('admin.products.destroy');
 
     // Products CSV Import (no price)
     Route::get('/products/import', [ProductImportController::class, 'showImportForm'])->name('admin.products.import.form');
